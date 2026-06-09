@@ -314,7 +314,8 @@
     .mapwrap{display:none}
     /* merged Today = fixed flex column: map pinned on top, list scrolls below */
     body[data-view="today"] .app{position:fixed; top:calc(var(--head-h) + env(safe-area-inset-top)); bottom:calc(var(--bar-h) + env(safe-area-inset-bottom)); left:0; right:0; display:flex; flex-direction:column; align-items:stretch; padding:0}
-    body[data-view="today"] .mapwrap{display:block; order:-1; flex:0 0 40%; position:relative; border:none; border-radius:0; box-shadow:none}
+    body[data-view="today"] .mapwrap{display:block; order:-1; flex:0 0 40%; position:relative; top:0; border:none; border-radius:0; box-shadow:none; transition:flex-basis .28s var(--ease)}
+    body.map-collapsed[data-view="today"] .mapwrap{flex-basis:0; min-height:0; border:none}
     body[data-view="today"] #main{flex:1 1 0; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 0 16px}
     #map{height:100%; min-height:0; border-radius:0}
     .map-foot{position:absolute; bottom:0; left:0; right:0; background:rgba(255,255,255,.9); backdrop-filter:blur(10px); z-index:2; border-top:1px solid var(--line)}
@@ -370,6 +371,17 @@
   .lock .btn{width:100%; justify-content:center}
   .lock-err{color:#ff8a7d; font-size:13px; min-height:16px}
 
+  /* map collapse toggle (mobile, Today only) */
+  .maptoggle{display:none}
+  @media(max-width:859px){
+    body[data-view="today"] .maptoggle{display:flex}
+    body.map-collapsed .maptoggle{background:var(--accent); color:var(--ink); border-color:var(--accent)}
+    .top-in{gap:8px}
+    .gear{width:34px; height:34px; font-size:16px}
+    .clock{padding:3px 8px; min-width:0}
+    .clock .t{font-size:13px}
+  }
+
   /* merged-Today map controls: compact floating buttons, no big legend bar */
   @media(max-width:859px){
     body[data-view="today"] .legend{display:none}
@@ -401,6 +413,7 @@
       <button data-view="itinerary">Plan</button>
       <button data-view="documents">Docs</button>
     </nav>
+    <button class="gear maptoggle" id="mapToggle" title="Show / hide map">🗺</button>
     <button class="gear" data-view="settings" title="Settings">⚙︎</button>
   </div>
 </header>
@@ -725,6 +738,7 @@ function renderClocks(){ const now=new Date(); const home=state.meta.homeTz,dest
     `<div class="clock"><div class="lbl">🏠 Home</div><div class="t mono">${fmtTime(now,home)}</div><div class="sub2">${esc(niceAbbr(home,now))} · ${fmtDateShort(now,home)}</div></div>`+
     `<div class="clock dest"><div class="lbl">🌴 ${esc(tzAbbr(dest))}</div><div class="t mono">${fmtTime(now,dest)}</div><div class="sub2">${esc(relOffset(dest,home))}</div></div>`;
 }
+function syncHeadH(){ const h=document.querySelector("header.top"); if(h) document.documentElement.style.setProperty("--head-h", Math.round(h.getBoundingClientRect().height)+"px"); }
 
 /* ---- view switching ---- */
 function setView(v){
@@ -732,7 +746,8 @@ function setView(v){
   document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
   if(v==="itinerary"||v==="documents"||v==="settings") applyMapFocus(null);
   renderMain();
-  if(map) setTimeout(()=>{ map.invalidateSize(); if(v==="today"||!isMobile()) refreshMap(); },70);
+  syncHeadH();
+  if(map) setTimeout(()=>{ syncHeadH(); map.invalidateSize(); if(v==="today"||!isMobile()) refreshMap(); },70);
 }
 function renderMain(){
   if(ui.view==="today") renderToday();
@@ -1129,8 +1144,9 @@ document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",(
 $("#tripSub").addEventListener("input",e=>{ state.meta.sub=e.target.value; save(); pushMeta(); });
 $("#fitBtn").addEventListener("click",()=>{ applyMapFocus(null); });
 $("#satBtn").addEventListener("click",toggleSat);
+$("#mapToggle").addEventListener("click",()=>{ const c=document.body.classList.toggle("map-collapsed"); localStorage.setItem("indoTrip.mapCollapsed", c?"1":""); if(map) setTimeout(()=>{ try{ map.invalidateSize(); }catch(e){} },300); });
 $("#scrim").addEventListener("click",e=>{ if(e.target.id==="scrim") closeModal(); });
-let _rT; window.addEventListener("resize",()=>{ clearTimeout(_rT); _rT=setTimeout(()=>{ if(map){ map.invalidateSize(); if(!isMobile()||ui.view==="map") refreshMap(); } if(ui.view==="today"){ const p=$("#pager"); if(p) p.scrollLeft=ui.dayIdx*(p.clientWidth||1); } },140); });
+let _rT; window.addEventListener("resize",()=>{ clearTimeout(_rT); _rT=setTimeout(()=>{ syncHeadH(); if(map){ map.invalidateSize(); if(!isMobile()||ui.view==="map") refreshMap(); } if(ui.view==="today"){ const p=$("#pager"); if(p) p.scrollLeft=ui.dayIdx*(p.clientWidth||1); } },140); });
 matchMedia("(max-width:859px)").addEventListener?.("change",()=>{ if(!isMobile()&&ui.view==="map") setView("today"); else if(map) setTimeout(()=>{ map.invalidateSize(); refreshMap(); },90); });
 
 /* ---- PWA: runtime icon + manifest ---- */
@@ -1154,8 +1170,9 @@ function buildSplash(){ $("#splashWm").innerHTML=[..."INDO 2026"].map((ch,i)=>`<
 function hideSplash(){ const s=$("#splash"); if(s){ s.classList.add("done"); setTimeout(()=>s&&s.remove&&s.remove(),600); } }
 
 /* ---- boot ---- */
-function afterLoad(){ if(state.meta.sub) $("#tripSub").value=state.meta.sub; renderClocks(); renderMain(); refreshMap(); loadGoogle(); }
+function afterLoad(){ if(state.meta.sub) $("#tripSub").value=state.meta.sub; renderClocks(); renderMain(); refreshMap(); loadGoogle(); syncHeadH(); }
 buildSplash();
+if(localStorage.getItem("indoTrip.mapCollapsed")) document.body.classList.add("map-collapsed");
 initMap();
 afterLoad();
 initFirebase();
@@ -1165,11 +1182,11 @@ $("#lockInput").addEventListener("keydown",e=>{ if(e.key==="Enter") tryUnlock();
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if($("#detail").classList.contains("show")) closeDetail(); else if($("#scrim").classList.contains("show")) closeModal(); } });
 setInterval(renderClocks,1000*20);
 setInterval(()=>{ if(ui.view==="today"){ const days=tripDays(); if(days[ui.dayIdx]?.key===dayKey(new Date(),state.meta.destTz)) renderToday(); } },60000);
-document.fonts?.ready.then(setupPWA); setupPWA();
+document.fonts?.ready.then(()=>{ setupPWA(); syncHeadH(); }); setupPWA();
 $("#splash").addEventListener("click",hideSplash);
 const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
 setTimeout(hideSplash, reduce?300:1400);
-setTimeout(()=>{ if(map) map.invalidateSize(); },300);
+setTimeout(()=>{ if(map) map.invalidateSize(); syncHeadH(); },300);
 </script>
 </body>
 </html>
