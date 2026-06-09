@@ -311,10 +311,11 @@
     .clock .sub2{display:none}
     .app{grid-template-columns:1fr; display:block; padding:0; gap:0; max-width:none}
     #main{border:none; border-radius:0; box-shadow:none; min-height:70vh; padding-bottom:calc(var(--bar-h) + env(safe-area-inset-bottom) + 14px)}
-    .mapwrap{position:fixed; left:0; right:0; top:calc(var(--head-h) + env(safe-area-inset-top)); bottom:calc(var(--bar-h) + env(safe-area-inset-bottom));
-      border-radius:0; border:none; box-shadow:none; display:none; z-index:6}
-    body[data-view="map"] .mapwrap{display:block}
-    body[data-view="map"] #main{display:none}
+    .mapwrap{display:none}
+    /* merged Today = fixed flex column: map pinned on top, list scrolls below */
+    body[data-view="today"] .app{position:fixed; top:calc(var(--head-h) + env(safe-area-inset-top)); bottom:calc(var(--bar-h) + env(safe-area-inset-bottom)); left:0; right:0; display:flex; flex-direction:column; align-items:stretch; padding:0}
+    body[data-view="today"] .mapwrap{display:block; order:-1; flex:0 0 40%; position:relative; border:none; border-radius:0; box-shadow:none}
+    body[data-view="today"] #main{flex:1 1 0; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 0 16px}
     #map{height:100%; min-height:0; border-radius:0}
     .map-foot{position:absolute; bottom:0; left:0; right:0; background:rgba(255,255,255,.9); backdrop-filter:blur(10px); z-index:2; border-top:1px solid var(--line)}
     .tabbar{display:flex}
@@ -331,6 +332,49 @@
   @media (prefers-reduced-motion: reduce){
     *{animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.05ms !important}
     .pager{scroll-behavior:auto}
+  }
+
+  /* compressed + sticky day selector */
+  .daystrip{padding:9px 14px 8px; gap:6px}
+  body[data-view="today"] .daystrip{position:sticky; top:0; z-index:5; background:var(--card); border-bottom:1px solid var(--line)}
+  .daypill{min-width:44px; padding:6px 9px}
+  .daypill .dd{font-size:16px}
+
+  /* tap-to-open detail view */
+  .detail{position:fixed; inset:0; z-index:120; background:var(--bg); display:none}
+  .detail.show{display:flex}
+  .detail-inner{position:relative; display:flex; flex-direction:column; width:100%; min-height:0}
+  .detail-map{flex:0 0 42%; min-height:190px; width:100%; background:#dfe3d8}
+  .detail-close{position:absolute; top:calc(env(safe-area-inset-top) + 12px); right:14px; z-index:5; width:38px;height:38px;border-radius:50%; background:rgba(255,255,255,.92); backdrop-filter:blur(8px); box-shadow:0 2px 10px rgba(0,0,0,.22); font-size:17px; display:flex;align-items:center;justify-content:center}
+  .detail-body{flex:1 1 0; overflow-y:auto; -webkit-overflow-scrolling:touch; background:var(--card); border-radius:22px 22px 0 0; margin-top:-22px; position:relative; z-index:2; padding:22px 18px calc(28px + env(safe-area-inset-bottom))}
+  .detail-body .dh{display:flex; align-items:center; gap:11px; margin-bottom:6px}
+  .detail-body .de{font-size:27px}
+  .detail-body .dt{font-size:21px; font-weight:700; letter-spacing:-.015em; flex:1; min-width:0}
+  .detail-sec{margin-top:16px}
+  .detail-sec h4{margin:0 0 7px; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted)}
+  @media(min-width:860px){
+    .detail{align-items:center; justify-content:center; padding:30px; background:rgba(20,22,15,.42); backdrop-filter:blur(3px)}
+    .detail-inner{width:min(560px,100%); max-height:88vh; background:var(--card); border-radius:20px; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.3)}
+    .detail-body{border-radius:0; margin-top:0}
+  }
+
+  /* passcode lock */
+  .lock{position:fixed; inset:0; z-index:210; background:radial-gradient(125% 80% at 50% 32%, #20241a, #0d0e0a); display:none; align-items:center; justify-content:center; padding:24px}
+  .lock.show{display:flex}
+  .lockbox{display:flex; flex-direction:column; align-items:center; gap:13px; width:min(320px,100%); text-align:center}
+  .lock-emoji{font-size:34px}
+  .lock-title{font-weight:700; font-size:24px; letter-spacing:.1em; color:#fff}
+  .lock-sub{color:#a9ae98; font-size:13px}
+  .lock-input{width:100%; text-align:center; font-size:22px; letter-spacing:.25em; padding:13px; border-radius:12px; border:1px solid #3a3f30; background:#171a12; color:#fff}
+  .lock-input:focus{outline:2px solid var(--accent); border-color:transparent}
+  .lock .btn{width:100%; justify-content:center}
+  .lock-err{color:#ff8a7d; font-size:13px; min-height:16px}
+
+  /* merged-Today map controls: compact floating buttons, no big legend bar */
+  @media(max-width:859px){
+    body[data-view="today"] .legend{display:none}
+    body[data-view="today"] .map-foot{position:absolute; top:auto; bottom:9px; right:9px; left:auto; width:auto; background:transparent; border:none; backdrop-filter:none; padding:0; gap:6px; flex-direction:column; align-items:flex-end}
+    body[data-view="today"] .map-foot .btn{margin:0; background:rgba(255,255,255,.93); backdrop-filter:blur(8px); box-shadow:0 2px 8px rgba(0,0,0,.2); border-color:transparent}
   }
 </style>
 </head>
@@ -376,9 +420,23 @@
 <nav class="tabbar" id="tabbar">
   <button data-view="today" class="active"><span class="ti">📅</span><span>Today</span></button>
   <button data-view="itinerary"><span class="ti">🗒️</span><span>Plan</span></button>
-  <button data-view="map"><span class="ti">🗺️</span><span>Map</span></button>
   <button data-view="documents"><span class="ti">📁</span><span>Docs</span></button>
 </nav>
+
+<div class="detail" id="detail"><div class="detail-inner">
+  <div class="detail-map" id="detailMap"></div>
+  <button class="detail-close" data-act="closeDetail">✕</button>
+  <div class="detail-body" id="detailBody"></div>
+</div></div>
+
+<div class="lock" id="lock"><div class="lockbox">
+  <div class="lock-emoji">🔒</div>
+  <div class="lock-title">INDO 2026</div>
+  <div class="lock-sub">Enter the access code</div>
+  <input id="lockInput" class="lock-input mono" type="password" inputmode="numeric" autocomplete="off" placeholder="••••">
+  <button class="btn lime" id="lockBtn">Unlock</button>
+  <div class="lock-err" id="lockErr"></div>
+</div></div>
 
 <div class="scrim" id="scrim"><div class="modal" id="modal"></div></div>
 <div id="toast"></div>
@@ -477,7 +535,7 @@ function onRemote(snap){
   state.hotspots = v.hotspots?Object.values(v.hotspots):[];
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
   if($("#tripSub") && document.activeElement!==$("#tripSub") && state.meta.sub) $("#tripSub").value=state.meta.sub;
-  renderClocks(); renderMain(); refreshMap();
+  renderClocks(); renderMain(); refreshMap(); checkLock();
 }
 function pushAll(){ if(!tripRef) return; const items={},docs={},hs={};
   state.items.forEach(i=>items[i.id]=i); state.docs.forEach(d=>docs[d.id]=d); (state.hotspots||[]).forEach(h=>hs[h.id]=h);
@@ -580,11 +638,53 @@ function refreshMap(){
 function applyMapFocus(key){ focusDayKey=key; refreshMap(); }
 function focusItem(id){
   ui.selId=id;
-  if(isMobile() && ui.view!=="map"){ setView("map"); }
+  if(isMobile() && ui.view!=="today"){ setView("today"); }
   const go=()=>{ const m=markersById[id]; if(m){ map.flyTo(m.getLatLng(),Math.max(map.getZoom(),14),{duration:.6}); setTimeout(()=>m.openPopup(),300);} };
   setTimeout(go, isMobile()?160:0);
   if(ui.view==="itinerary") renderMain();
 }
+
+/* ---- tap-to-open detail view ---- */
+let detailMap=null;
+function openDetail(id){
+  const it=state.items.find(x=>x.id===id) || (state.hotspots||[]).find(x=>x.id===id);
+  if(!it) return;
+  const t=TYPES[it.type]||TYPES.other;
+  const docs=(it.docIds||[]).map(x=>state.docs.find(d=>d.id===x)).filter(Boolean);
+  const locsHtml=(it.fromLoc||it.toLoc)?(locLineHTML(it,it.fromLoc,"from")+locLineHTML(it,it.toLoc,"to")):locLineHTML(it,it.location,"main");
+  $("#detailBody").innerHTML=`
+    <div class="dh"><span class="de">${t.emoji}</span><span class="dt">${esc(it.title||t.label)}</span></div>
+    ${whenHTML(it)}
+    ${locsHtml?`<div class="detail-sec"><h4>Location</h4>${locsHtml}</div>`:""}
+    ${it.conf?`<div class="detail-sec"><h4>Booking ref</h4><span class="mono">${esc(it.conf)}</span> <button class="iconbtn" style="width:24px;height:24px;vertical-align:-6px" data-act="copy-conf" data-id="${it.id}">⧉</button></div>`:""}
+    ${it.notes?`<div class="detail-sec"><h4>Notes</h4><div class="notes">${esc(it.notes)}</div></div>`:""}
+    ${docs.length?`<div class="detail-sec"><h4>Documents</h4><div class="chiprow">${docs.map(d=>`<span class="chip doc" data-act="opendoc" data-url="${esc(d.url)}">📎 ${esc(d.title)}</span>`).join("")}</div></div>`:""}
+    <div class="detail-sec" style="display:flex;gap:10px;margin-top:24px">
+      <button class="btn lime" data-act="edit" data-id="${it.id}">✎ Edit</button>
+      <button class="btn ghost" data-act="closeDetail">Close</button>
+    </div>`;
+  $("#detail").classList.add("show");
+  if(detailMap){ try{detailMap.remove();}catch(e){} detailMap=null; }
+  const pts=[];
+  [it.fromLoc,it.toLoc,it.location].forEach(l=>{ if(l&&l.lat!=null) pts.push([l.lat,l.lng]); });
+  const mapEl=$("#detailMap");
+  if(!pts.length){ mapEl.style.display="none"; return; }
+  mapEl.style.display="";
+  setTimeout(()=>{
+    detailMap=L.map("detailMap",{zoomControl:false,attributionControl:false,scrollWheelZoom:false}).setView(pts[0],14);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{maxZoom:19,subdomains:"abcd"}).addTo(detailMap);
+    pts.forEach(p=>L.marker(p,{icon:pinIcon(it.type)}).addTo(detailMap));
+    if(pts.length>1){ try{ detailMap.fitBounds(L.latLngBounds(pts).pad(.4)); }catch(e){} }
+    detailMap.invalidateSize();
+  },60);
+}
+function closeDetail(){ $("#detail").classList.remove("show"); if(detailMap){ try{detailMap.remove();}catch(e){} detailMap=null; } }
+
+/* ---- passcode lock ---- */
+function hashCode(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h*33)^s.charCodeAt(i))>>>0; return "h"+h.toString(36); }
+function isLocked(){ return !!state.meta.passHash && localStorage.getItem("indoTrip.unlock")!==state.meta.passHash; }
+function checkLock(){ const el=$("#lock"); if(!el) return; if(isLocked()){ el.classList.add("show"); setTimeout(()=>{ const i=$("#lockInput"); if(i) i.focus(); },120); } else el.classList.remove("show"); }
+function tryUnlock(){ const v=($("#lockInput").value||"").trim(); if(hashCode(v)===state.meta.passHash){ localStorage.setItem("indoTrip.unlock", state.meta.passHash); $("#lockErr").textContent=""; $("#lock").classList.remove("show"); } else { $("#lockErr").textContent="Wrong code — try again"; $("#lockInput").value=""; } }
 
 /* ---- google travel times ---- */
 function loadGoogle(){ const key=state.meta.mapsKey; if(!key||googleReady||googleLoading) return; googleLoading=true;
@@ -632,7 +732,7 @@ function setView(v){
   document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
   if(v==="itinerary"||v==="documents"||v==="settings") applyMapFocus(null);
   renderMain();
-  if(map) setTimeout(()=>{ map.invalidateSize(); if(v==="map"||!isMobile()) refreshMap(); },70);
+  if(map) setTimeout(()=>{ map.invalidateSize(); if(v==="today"||!isMobile()) refreshMap(); },70);
 }
 function renderMain(){
   if(ui.view==="today") renderToday();
@@ -671,8 +771,7 @@ function renderToday(){
   const pills=days.map((d,i)=>`<button class="daypill ${i===ui.dayIdx?"active":""} ${d.key===todayKey?"istoday":""}" data-day="${i}">
       <span class="dw">${esc(fmtWeekday(d.instant,d.tz))}</span><span class="dd">${esc(fmtDayNum(d.instant,d.tz))}</span><span class="tdot"></span></button>`).join("");
   const pages=days.map((d,i)=>dayPage(d,i,days.length,todayKey)).join("");
-  $("#main").innerHTML=`<div class="viewhead"><div class="vt">Today</div><div class="vs">Swipe between days · tap a date</div></div>
-    <div class="daystrip" id="daystrip">${pills}</div>
+  $("#main").innerHTML=`<div class="daystrip" id="daystrip">${pills}</div>
     <div class="pager" id="pager">${pages}</div>`;
   setupPager(days);
 }
@@ -732,7 +831,7 @@ function tlRow(it,isLast){
   return {__item:true, html:`<div class="tl-row ${isLast?"last":""}">
     <div class="tl-time mono">${timeHtml}${ei&&isLeg?`<br>${fmtTime(ei,eTz)}<span class="z">${esc(tzAbbr(eTz))}</span>`:""}</div>
     <div class="tl-rail"><span class="tl-dot" style="--c:${color}"></span></div>
-    <div class="tl-card ${cls}">
+    <div class="tl-card ${cls}" data-card="${it.id}">
       <div class="h"><span class="e">${t.emoji}</span><span class="t">${esc(it.title||t.label)}</span>${badge}
         <button class="iconbtn" title="Edit" data-act="edit" data-id="${it.id}">✎</button></div>
       ${locHtml}
@@ -773,6 +872,7 @@ function setupPager(days){
   strip.querySelectorAll(".daypill").forEach(p=>p.addEventListener("click",()=>{ const i=+p.dataset.day; ui.dayIdx=i;
     document.querySelectorAll(".daypill").forEach((q,j)=>q.classList.toggle("active",j===i));
     applyMapFocus(days[i]?.key||null); setTo(i,true); }));
+  if(map) setTimeout(()=>{ try{ map.invalidateSize(); }catch(e){} },60);
 }
 
 /* ====================== PLAN (full itinerary) ====================== */
@@ -887,6 +987,13 @@ function renderSettings(){ const m=state.meta; const keyOn=!!m.mapsKey;
         <button class="btn ghost sm" data-act="import">⤒ Import</button>
         <button class="btn danger sm" data-act="clear">Clear everything</button>
       </div></div>
+    <div class="field"><label>Access passcode</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input class="inp mono" id="passInput" type="text" autocomplete="off" placeholder="${state.meta.passHash?'•••• (set — type to change)':'set a code'}" style="flex:1;min-width:140px">
+        <button class="btn ghost sm" data-act="setPass">${state.meta.passHash?'Change':'Set'}</button>
+        ${state.meta.passHash?`<button class="btn danger sm" data-act="clearPass">Remove</button>`:""}
+      </div>
+      <div class="hint">A lock screen when the app opens, shared with Elisa. Soft (client-side) protection — keeps casual eyes out.</div></div>
     <div class="field"><label>Install</label><div class="hint">On iPhone: Safari → Share → <b>Add to Home Screen</b> to launch INDO 2026 full-screen like a real app.</div></div>
   </div>`;
   setSyncStatus(syncStatus);
@@ -983,12 +1090,15 @@ function loadExample(){ const ex=[
 /* ---- global handlers ---- */
 document.addEventListener("click",e=>{
   const a=e.target.closest("[data-act]"); const card=e.target.closest("[data-card]");
-  if(card&&!a){ focusItem(card.dataset.card); return; }
+  if(card&&!a){ openDetail(card.dataset.card); return; }
   const g=e.target.closest("[data-geo]"); if(g){ doGeocode(g.dataset.geo); return; }
   if(!a) return; const act=a.dataset.act,id=a.dataset.id;
   switch(act){
     case "add": itemModal(null); break;
-    case "edit": itemModal(state.items.find(x=>x.id===id)); break;
+    case "edit": closeDetail(); itemModal(state.items.find(x=>x.id===id)); break;
+    case "closeDetail": closeDetail(); break;
+    case "setPass": { const v=($("#passInput").value||"").trim(); if(!v){ toast("Type a code first"); break; } state.meta.passHash=hashCode(v); save(); pushMeta(); localStorage.setItem("indoTrip.unlock", state.meta.passHash); renderSettings(); toast("Passcode set",true); break; }
+    case "clearPass": state.meta.passHash=""; save(); pushMeta(); localStorage.removeItem("indoTrip.unlock"); renderSettings(); toast("Passcode removed",true); break;
     case "saveItem": saveItem(); break;
     case "delItem": if(confirm("Delete this item?")){ state.items=state.items.filter(x=>x.id!==id); save(); syncRemove("items/"+id); closeModal(); refreshMap(); renderMain(); toast("Deleted",true);} break;
     case "closeModal": closeModal(); break;
@@ -1049,6 +1159,10 @@ buildSplash();
 initMap();
 afterLoad();
 initFirebase();
+checkLock();
+$("#lockBtn").addEventListener("click",tryUnlock);
+$("#lockInput").addEventListener("keydown",e=>{ if(e.key==="Enter") tryUnlock(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if($("#detail").classList.contains("show")) closeDetail(); else if($("#scrim").classList.contains("show")) closeModal(); } });
 setInterval(renderClocks,1000*20);
 setInterval(()=>{ if(ui.view==="today"){ const days=tripDays(); if(days[ui.dayIdx]?.key===dayKey(new Date(),state.meta.destTz)) renderToday(); } },60000);
 document.fonts?.ready.then(setupPWA); setupPWA();
