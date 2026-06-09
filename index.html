@@ -405,7 +405,7 @@
 
   /* inline expand of an itinerary item */
   .tl-card{cursor:pointer}
-  .tl-card .h .chev{color:var(--faint); font-size:12px; transition:transform .22s var(--ease)}
+  .tl-card .h .chev{color:var(--faint); font-size:12px; transition:transform .22s var(--ease); padding:6px 8px; margin:-6px -4px -6px 0}
   .tl-card.expanded .h .chev{transform:rotate(180deg)}
   .tl-card.expanded{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft)}
   .tl-expand{max-height:0; overflow:hidden; opacity:0; transition:max-height .3s var(--ease), opacity .25s, margin .2s}
@@ -666,7 +666,8 @@ function refreshMap(){
       m.bindPopup(`<div class="pop"><div class="pt">${t.emoji} ${esc(it.title||t.label)}</div>`+
         (p.loc.name?`<div class="pa">${esc(p.loc.name)}</div>`:"")+(p.loc.address?`<div class="pa">${esc(p.loc.address)}</div>`:"")+
         `<div class="pactions"><button onclick="copy('${esc((p.loc.address||p.loc.name||"").replace(/'/g,"\\'"))}')">⧉ Copy</button>`+
-        `<a href="${gmap}" target="_blank" rel="noopener">↗ Maps</a></div></div>`);
+        `<a href="${gmap}" target="_blank" rel="noopener">↗ Maps</a></div></div>`,
+        {maxWidth:250, autoPanPaddingTopLeft:[14,14], autoPanPaddingBottomRight:[14,14]});
       markersById[it.id+"-"+p.role]=m; if(p.role==="main"||p.role==="to") markersById[it.id]=m;
     });
   });
@@ -677,12 +678,30 @@ function refreshMap(){
   $("#legend").innerHTML=used.map(ty=>{const t=TYPES[ty]||TYPES.other;return `<span><i style="background:${TYPE_HEX[ty]||'#0e9aa0'}"></i>${t.label}</span>`;}).join("")||'<span style="color:var(--faint)">Add a stop to see it on the map</span>';
 }
 function applyMapFocus(key){ focusDayKey=key; refreshMap(); }
+function locsOf(it){ const pts=[]; [it&&it.fromLoc, it&&it.toLoc, it&&it.location].forEach(l=>{ if(l&&l.lat!=null) pts.push(L.latLng(l.lat,l.lng)); }); return pts; }
 function focusItem(id){
+  const it = state.items.find(x=>x.id===id) || (state.hotspots||[]).find(x=>x.id===id);
   ui.selId=id;
   if(isMobile() && ui.view!=="today"){ setView("today"); }
-  const go=()=>{ const m=markersById[id]; if(m){ map.flyTo(m.getLatLng(),Math.max(map.getZoom(),14),{duration:.6}); setTimeout(()=>m.openPopup(),300);} };
-  setTimeout(go, isMobile()?160:0);
   if(ui.view==="itinerary") renderMain();
+  if(!it || document.body.classList.contains("map-collapsed")) return; // map hidden — nothing to pan
+  const run=()=>{
+    if(!map) return;
+    const pts=locsOf(it); if(!pts.length) return;
+    const pm = markersById[id] || markersById[id+"-to"] || markersById[id+"-main"] || markersById[id+"-from"];
+    const far = pts.length>1 && pts[0].distanceTo(pts[pts.length-1])>400000; // >400km = a flight: don't zoom out to the world
+    if(pts.length>1 && !far){
+      try{ map.fitBounds(L.latLngBounds(pts), {maxZoom:15, paddingTopLeft:[24,100], paddingBottomRight:[24,24]}); }catch(e){}
+      if(pm) setTimeout(()=>pm.openPopup(),400);
+    } else {
+      const target = pts.length>1 ? pts[pts.length-1] : pts[0];
+      const z=Math.max(map.getZoom(),14);
+      const p=map.project(target,z); p.y -= map.getSize().y*0.20; // shift centre north so the marker sits low and the popup fits above
+      map.flyTo(map.unproject(p,z), z, {duration:.5});
+      if(pm) setTimeout(()=>pm.openPopup(),560);
+    }
+  };
+  setTimeout(run, isMobile()?180:0);
 }
 
 /* ---- tap-to-open detail view ---- */
@@ -721,18 +740,22 @@ function openDetail(id){
 }
 function closeDetail(){ $("#detail").classList.remove("show"); if(detailMap){ try{detailMap.remove();}catch(e){} detailMap=null; } }
 /* inline expand of a timeline card + sync the map */
-let _expTs=0;
-function toggleExpand(id){
+// Idempotent so a double-fire can't toggle it back: body-tap always expands, chevron collapses.
+function expandItem(id){
   if(!id) return;
-  const now=Date.now();
-  if(id===ui._lastTid && now-_expTs<350) return; // swallow accidental double-fire (tap fires twice)
-  _expTs=now; ui._lastTid=id;
-  ui.expandedId = (ui.expandedId===id)?null:id;
-  ui.selId = ui.expandedId?id:null;
+  if(ui.expandedId===id){ focusItem(id); return; }   // already open — just re-centre the map
+  ui.expandedId=id; ui.selId=id;
   const m=$("#main"), sc=m?m.scrollTop:0;
-  renderToday();                       // deterministic: tlRow re-applies .expanded from ui.expandedId
+  renderToday();                                       // tlRow applies .expanded from ui.expandedId
   if(m) m.scrollTop=sc;
-  if(ui.expandedId===id) setTimeout(()=>focusItem(id),40);
+  setTimeout(()=>focusItem(id),40);
+}
+function collapseItem(){
+  if(!ui.expandedId) return;
+  ui.expandedId=null;
+  const m=$("#main"), sc=m?m.scrollTop:0;
+  renderToday();
+  if(m) m.scrollTop=sc;
 }
 
 /* ---- passcode lock ---- */
@@ -901,7 +924,7 @@ function tlRow(it,isLast){
     <div class="tl-time mono">${timeHtml}${ei&&isLeg?`<br>${fmtTime(ei,eTz)}<span class="z">${esc(tzAbbr(eTz))}</span>`:""}</div>
     <div class="tl-rail"><span class="tl-dot" style="--c:${color}"></span></div>
     <div class="tl-card ${cls} ${it.id===ui.expandedId?'expanded':''}" data-card="${it.id}">
-      <div class="h"><span class="e">${t.emoji}</span><span class="t">${esc(it.title||t.label)}</span>${badge}<span class="chev">▾</span></div>
+      <div class="h"><span class="e">${t.emoji}</span><span class="t">${esc(it.title||t.label)}</span>${badge}<span class="chev"${it.id===ui.expandedId?' data-act="collapse"':''}>▾</span></div>
       ${brief?`<div class="loc-brief">📍 <span class="nm">${brief}</span></div>`:""}
       ${expand}
     </div></div>`};
@@ -1156,13 +1179,14 @@ function loadExample(){ const ex=[
 document.addEventListener("click",e=>{
   const a=e.target.closest("[data-act]"); const card=e.target.closest("[data-card]");
   if(card&&!a){ if(e.target.closest("a")) return;
-    if(card.classList.contains("tl-card")) toggleExpand(card.dataset.card);
+    if(card.classList.contains("tl-card")) expandItem(card.dataset.card);
     else focusItem(card.dataset.card);
     return; }
   const g=e.target.closest("[data-geo]"); if(g){ doGeocode(g.dataset.geo); return; }
   if(!a) return; const act=a.dataset.act,id=a.dataset.id;
   switch(act){
     case "add": itemModal(null); break;
+    case "collapse": collapseItem(); break;
     case "togglePills": { const s=$("#daystrip"); if(s){ s.classList.toggle("collapsed"); $("#datebar")?.classList.toggle("open", !s.classList.contains("collapsed")); } break; }
     case "goToday": { if(pagerCtl){ pagerCtl.setTo(currentDayIndex(pagerCtl.days),true); $("#daystrip")?.classList.add("collapsed"); $("#datebar")?.classList.remove("open"); } break; }
     case "edit": closeDetail(); itemModal(state.items.find(x=>x.id===id)); break;
