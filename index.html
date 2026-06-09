@@ -302,7 +302,7 @@
     :root{ --head-h:54px; }
     .desktop-only{display:none !important}
     .mobile-only{display:flex}
-    .top-in{padding:7px 14px; min-height:var(--head-h)}
+    .top-in{padding:5px 12px}
     .brand .wm{font-size:16px}
     .brand .sub{display:none}
     .clock{min-width:0; padding:4px 9px; border-radius:9px}
@@ -392,10 +392,10 @@
   /* collapsible date selector */
   .todayhead{position:sticky; top:0; z-index:6; background:var(--card)}
   .datebar{display:flex; align-items:center; gap:10px; padding:14px 16px 8px; background:var(--card)}
-  .datemain{display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; flex:1; text-align:left; padding:0}
-  .datemain .dbig{font-size:21px; font-weight:700; letter-spacing:-.015em}
-  .datemain .dsub{color:var(--muted); font-size:12.5px}
-  .datemain .dtz{font-size:10.5px; color:var(--accent-deep); background:var(--accent-soft); padding:2px 8px; border-radius:20px; font-weight:600}
+  .datemain{display:flex; align-items:baseline; gap:7px; flex-wrap:nowrap; flex:1; min-width:0; overflow:hidden; text-align:left; padding:0}
+  .datemain .dbig{font-size:18px; font-weight:700; letter-spacing:-.015em; white-space:nowrap}
+  .datemain .dsub{color:var(--muted); font-size:11px; white-space:nowrap}
+  .datemain .dtz{font-size:10px; color:var(--accent-deep); background:var(--accent-soft); padding:2px 7px; border-radius:20px; font-weight:600; white-space:nowrap}
   .datemain .chev{color:var(--faint); font-size:12px; transition:transform .22s var(--ease)}
   .datebar.open .chev{transform:rotate(180deg)}
   .gotoday{width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:var(--card); color:var(--accent-deep); font-size:15px; display:flex; align-items:center; justify-content:center; flex:none}
@@ -410,6 +410,9 @@
   .tl-card.expanded{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft)}
   .tl-expand{max-height:0; overflow:hidden; opacity:0; transition:max-height .3s var(--ease), opacity .25s, margin .2s}
   .tl-card.expanded .tl-expand{max-height:720px; opacity:1; margin-top:9px}
+  /* expanded item goes full-width: collapse the side timeline rail */
+  .tl-row.rowexp{grid-template-columns:1fr}
+  .tl-row.rowexp .tl-time, .tl-row.rowexp .tl-rail{display:none}
   .loc-brief{display:flex; align-items:center; gap:6px; margin-top:5px; font-size:12.5px; color:var(--muted)}
   .loc-brief .nm{color:var(--ink)}
 </style>
@@ -718,13 +721,18 @@ function openDetail(id){
 }
 function closeDetail(){ $("#detail").classList.remove("show"); if(detailMap){ try{detailMap.remove();}catch(e){} detailMap=null; } }
 /* inline expand of a timeline card + sync the map */
-function toggleExpand(cardEl,id){
-  const open = ui.expandedId===id;
-  ui.expandedId = open?null:id;
-  document.querySelectorAll(".tl-card.expanded").forEach(c=>c.classList.remove("expanded"));
-  if(!open){ cardEl.classList.add("expanded"); ui.selId=id; focusItem(id);
-    setTimeout(()=>cardEl.scrollIntoView({block:"nearest",behavior:"smooth"}),140); }
-  else ui.selId=null;
+let _expTs=0;
+function toggleExpand(id){
+  if(!id) return;
+  const now=Date.now();
+  if(id===ui._lastTid && now-_expTs<350) return; // swallow accidental double-fire (tap fires twice)
+  _expTs=now; ui._lastTid=id;
+  ui.expandedId = (ui.expandedId===id)?null:id;
+  ui.selId = ui.expandedId?id:null;
+  const m=$("#main"), sc=m?m.scrollTop:0;
+  renderToday();                       // deterministic: tlRow re-applies .expanded from ui.expandedId
+  if(m) m.scrollTop=sc;
+  if(ui.expandedId===id) setTimeout(()=>focusItem(id),40);
 }
 
 /* ---- passcode lock ---- */
@@ -827,7 +835,7 @@ function renderToday(){
         <button class="datemain" data-act="togglePills">
           <span class="dbig" id="dbDate">${esc(fmtDateFull(cur.instant,cur.tz))}</span>
           <span class="chev">▾</span>
-          <span class="dsub" id="dbSub">Day ${ui.dayIdx+1} of ${days.length}</span>
+          <span class="dsub" id="dbSub">Day ${ui.dayIdx+1}/${days.length}</span>
           <span class="dtz" id="dbTz">${esc(tzAbbr(cur.tz))}</span>
         </button>
         <button class="gotoday" data-act="goToday" title="Go to current day">⊙</button>
@@ -881,16 +889,15 @@ function tlRow(it,isLast){
     : (it.location&&(it.location.name||it.location.address)) ? esc(it.location.name||it.location.address) : "";
   const docs=(it.docIds||[]).map(x=>state.docs.find(d=>d.id===x)).filter(Boolean);
   const locsFull = isLeg ? (locLineHTML(it,it.fromLoc,"from")+locLineHTML(it,it.toLoc,"to")) : locLineHTML(it,it.location,"main");
-  const homeEq = si ? `<div class="home-eq" style="margin-top:6px">≈ ${fmtTime(si,state.meta.homeTz)} your time${(isLeg&&ei&&sTz!==eTz)?` · ${esc(relTz(eTz,sTz))} zone change`:""}</div>` : "";
   const expand = `<div class="tl-expand">
+      ${whenHTML(it)}
       ${locsFull||""}
-      ${homeEq}
       ${it.conf?`<div class="ref" style="margin-top:8px">Booking ref <span class="mono">${esc(it.conf)}</span> <button class="iconbtn" style="width:22px;height:22px;vertical-align:-5px" data-act="copy-conf" data-id="${it.id}">⧉</button></div>`:""}
       ${it.notes?`<div class="note">${esc(it.notes)}</div>`:""}
       ${docs.length?`<div class="chiprow" style="margin-top:8px">${docs.map(d=>`<span class="chip doc" data-act="opendoc" data-url="${esc(d.url)}">📎 ${esc(d.title)}</span>`).join("")}</div>`:""}
       <div style="margin-top:12px"><button class="btn lime sm" data-act="edit" data-id="${it.id}">✎ Edit</button></div>
     </div>`;
-  return {__item:true, html:`<div class="tl-row ${isLast?"last":""}">
+  return {__item:true, html:`<div class="tl-row ${isLast?"last":""} ${it.id===ui.expandedId?'rowexp':''}">
     <div class="tl-time mono">${timeHtml}${ei&&isLeg?`<br>${fmtTime(ei,eTz)}<span class="z">${esc(tzAbbr(eTz))}</span>`:""}</div>
     <div class="tl-rail"><span class="tl-dot" style="--c:${color}"></span></div>
     <div class="tl-card ${cls} ${it.id===ui.expandedId?'expanded':''}" data-card="${it.id}">
@@ -908,7 +915,7 @@ function tlLeg(lg){
       · <a href="${lg.gmapDir}" target="_blank" rel="noopener">route ↗</a></div></div>`,
     __leg:true, lg};
 }
-function updateDateBar(days,i){ const d=days[i]; if(!d) return; const D=$("#dbDate"),S=$("#dbSub"),T=$("#dbTz"); if(D)D.textContent=fmtDateFull(d.instant,d.tz); if(S)S.textContent="Day "+(i+1)+" of "+days.length; if(T)T.textContent=tzAbbr(d.tz); }
+function updateDateBar(days,i){ const d=days[i]; if(!d) return; const D=$("#dbDate"),S=$("#dbSub"),T=$("#dbTz"); if(D)D.textContent=fmtDateFull(d.instant,d.tz); if(S)S.textContent="Day "+(i+1)+"/"+days.length; if(T)T.textContent=tzAbbr(d.tz); }
 function setupPager(days){
   const pager=$("#pager"), strip=$("#daystrip"); if(!pager) return;
   const w=()=>pager.clientWidth||1;
@@ -1149,7 +1156,7 @@ function loadExample(){ const ex=[
 document.addEventListener("click",e=>{
   const a=e.target.closest("[data-act]"); const card=e.target.closest("[data-card]");
   if(card&&!a){ if(e.target.closest("a")) return;
-    if(card.classList.contains("tl-card")) toggleExpand(card, card.dataset.card);
+    if(card.classList.contains("tl-card")) toggleExpand(card.dataset.card);
     else focusItem(card.dataset.card);
     return; }
   const g=e.target.closest("[data-geo]"); if(g){ doGeocode(g.dataset.geo); return; }
@@ -1192,7 +1199,23 @@ document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",(
 $("#tripSub").addEventListener("input",e=>{ state.meta.sub=e.target.value; save(); pushMeta(); });
 $("#fitBtn").addEventListener("click",()=>{ applyMapFocus(null); });
 $("#satBtn").addEventListener("click",toggleSat);
-$("#mapToggle").addEventListener("click",()=>{ const c=document.body.classList.toggle("map-collapsed"); localStorage.setItem("indoTrip.mapCollapsed", c?"1":""); if(map) setTimeout(()=>{ try{ map.invalidateSize(); }catch(e){} },300); });
+function setMapCollapsed(c){ document.body.classList.toggle("map-collapsed", c); localStorage.setItem("indoTrip.mapCollapsed", c?"1":""); if(map) setTimeout(()=>{ try{ map.invalidateSize(); }catch(e){} },300); }
+$("#mapToggle").addEventListener("click",()=>setMapCollapsed(!document.body.classList.contains("map-collapsed")));
+/* gestures: flick up on the map to collapse it; pull down at the top of the list to bring it back */
+(function(){
+  const mw=document.querySelector(".mapwrap"), main=$("#main");
+  if(mw){ let sy=0,st=0,on=false;
+    mw.addEventListener("touchstart",e=>{ if(e.touches.length!==1)return; sy=e.touches[0].clientY; st=Date.now(); on=true; },{passive:true});
+    mw.addEventListener("touchend",e=>{ if(!on||!isMobile()||ui.view!=="today")return; on=false;
+      const dy=e.changedTouches[0].clientY-sy, dt=Date.now()-st;
+      if(dy<-55 && dt<420 && !document.body.classList.contains("map-collapsed")) setMapCollapsed(true);
+    },{passive:true});
+  }
+  if(main){ let psy=0,pull=false;
+    main.addEventListener("touchstart",e=>{ if(e.touches.length!==1)return; psy=e.touches[0].clientY; pull = main.scrollTop<=0 && isMobile() && ui.view==="today" && document.body.classList.contains("map-collapsed"); },{passive:true});
+    main.addEventListener("touchmove",e=>{ if(!pull)return; if(e.touches[0].clientY-psy>70){ pull=false; setMapCollapsed(false); } },{passive:true});
+  }
+})();
 $("#scrim").addEventListener("click",e=>{ if(e.target.id==="scrim") closeModal(); });
 let _rT; window.addEventListener("resize",()=>{ clearTimeout(_rT); _rT=setTimeout(()=>{ syncHeadH(); if(map){ map.invalidateSize(); if(!isMobile()||ui.view==="map") refreshMap(); } if(ui.view==="today"){ const p=$("#pager"); if(p) p.scrollLeft=ui.dayIdx*(p.clientWidth||1); } },140); });
 matchMedia("(max-width:859px)").addEventListener?.("change",()=>{ if(!isMobile()&&ui.view==="map") setView("today"); else if(map) setTimeout(()=>{ map.invalidateSize(); refreshMap(); },90); });
