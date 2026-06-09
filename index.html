@@ -88,9 +88,10 @@
     background:rgba(255,255,255,.84); backdrop-filter:saturate(180%) blur(22px); border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom)}
   .tabbar button{flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 0 7px; color:var(--faint); font-size:10px; font-weight:600; transition:color .15s}
   .tabbar button .ti{font-size:20px; line-height:1; transition:transform .15s var(--ease)}
-  .tabbar button.active{color:var(--ink)}
-  .tabbar button.active .ti{transform:translateY(-2px) scale(1.08)}
-  .tabbar button:active .ti{transform:scale(.9)}
+  .tabbar button .ti{padding:3px 16px; border-radius:20px; transition:background .15s, transform .15s var(--ease)}
+  .tabbar button.active{color:var(--ink); font-weight:700}
+  .tabbar button.active .ti{background:var(--accent); transform:translateY(-1px)}
+  .tabbar button:active .ti{transform:scale(.92)}
 
   /* ---------- Section heads / buttons ---------- */
   .sec-head{display:flex; align-items:center; gap:12px; padding:16px 18px; border-bottom:1px solid var(--line); flex-wrap:wrap}
@@ -290,6 +291,8 @@
   .pop button, .pop a{font-size:12px; padding:4px 9px; border-radius:7px; border:1px solid var(--line-strong); background:#fff; color:var(--ink); cursor:pointer; display:inline-flex; align-items:center; gap:4px}
   .marker-num{display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);width:26px;height:26px;box-shadow:0 2px 6px rgba(0,0,0,.3);border:2px solid #fff}
   .marker-num span{transform:rotate(45deg)}
+  .epin{width:30px;height:30px;border-radius:50%;background:#fff;border:2.5px solid var(--c,#0e9aa0);box-shadow:0 3px 9px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:15px;position:relative}
+  .epin::after{content:"";position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);width:0;height:0;border:5px solid transparent;border-top-color:var(--c,#0e9aa0)}
 
   .desktop-only{display:flex}
   .mobile-only{display:none}
@@ -364,7 +367,8 @@
     <div id="map"></div>
     <div class="map-foot">
       <div class="legend" id="legend"></div>
-      <button class="btn ghost sm" id="fitBtn" style="margin-left:auto">⤢ Fit all</button>
+      <button class="btn ghost sm" id="satBtn" style="margin-left:auto">🛰 Satellite</button>
+      <button class="btn ghost sm" id="fitBtn">⤢ Fit all</button>
     </div>
   </section>
 </div>
@@ -416,7 +420,7 @@ const legCache = new Map();
 let googleReady=false, googleLoading=false;
 let focusDayKey=null;
 
-function blankState(){ return { meta:{ sub:"Henri & Elisa", homeTz:"Europe/London", destTz:"Asia/Makassar", driveUrl:"", mapsKey:"" }, items:[], docs:[] }; }
+function blankState(){ return { meta:{ sub:"Henri & Elisa", homeTz:"Europe/London", destTz:"Asia/Makassar", driveUrl:"", mapsKey:"", clock:"24" }, items:[], docs:[] }; }
 function load(){ try{ const s=JSON.parse(localStorage.getItem(STORE_KEY)); if(s&&s.meta) return s; }catch(e){} return blankState(); }
 function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
@@ -438,7 +442,7 @@ function wallToInstant(dateStr,timeStr,tz){ if(!dateStr) return null;
   let off=tzOffsetMin(tz,naive); let inst=new Date(naive.getTime()-off*60000);
   const off2=tzOffsetMin(tz,inst); if(off2!==off) inst=new Date(naive.getTime()-off2*60000);
   return inst; }
-function fmtTime(inst,tz){ return inst?new Intl.DateTimeFormat("en-GB",{timeZone:tz,hour:"2-digit",minute:"2-digit",hour12:false}).format(inst):""; }
+function fmtTime(inst,tz){ if(!inst) return ""; const h12=state.meta.clock==="12"; return new Intl.DateTimeFormat("en-GB",{timeZone:tz,hour:h12?"numeric":"2-digit",minute:"2-digit",hour12:h12}).format(inst); }
 function fmtDateFull(inst,tz){ return inst?new Intl.DateTimeFormat("en-GB",{timeZone:tz,weekday:"long",day:"numeric",month:"long"}).format(inst):""; }
 function fmtDateShort(inst,tz){ return inst?new Intl.DateTimeFormat("en-GB",{timeZone:tz,weekday:"short",day:"numeric",month:"short"}).format(inst):""; }
 function fmtWeekday(inst,tz){ return inst?new Intl.DateTimeFormat("en-GB",{timeZone:tz,weekday:"short"}).format(inst):""; }
@@ -466,12 +470,22 @@ function itemDayKey(it){ const si=startInstant(it); return si?dayKey(si,startTz(
 
 /* ---- map ---- */
 let map, markerLayer, lineLayer, markersById={};
+let baseStd, baseSat, satLabels, satOn=false;
 function initMap(){
   map=L.map("map",{zoomControl:true,scrollWheelZoom:true}).setView([-8.55,115.2],9);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{attribution:'&copy; OpenStreetMap &copy; CARTO',maxZoom:19,subdomains:"abcd"}).addTo(map);
+  baseStd=L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{attribution:'&copy; OpenStreetMap &copy; CARTO',maxZoom:19,subdomains:"abcd"});
+  baseSat=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{attribution:'Imagery &copy; Esri',maxZoom:19});
+  satLabels=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,opacity:.9});
+  baseStd.addTo(map);
   markerLayer=L.layerGroup().addTo(map); lineLayer=L.layerGroup().addTo(map);
 }
-function pinIcon(color,num){ return L.divIcon({className:"",html:`<div class="marker-num" style="background:${color}"><span>${num}</span></div>`,iconSize:[26,26],iconAnchor:[13,26],popupAnchor:[0,-24]}); }
+function toggleSat(){ satOn=!satOn;
+  if(satOn){ map.removeLayer(baseStd); baseSat.addTo(map); satLabels.addTo(map); }
+  else { map.removeLayer(baseSat); map.removeLayer(satLabels); baseStd.addTo(map); }
+  const b=$("#satBtn"); if(b) b.textContent=satOn?"🗺 Map":"🛰 Satellite";
+}
+function pinIcon(type){ const t=TYPES[type]||TYPES.other; const color=TYPE_HEX[type]||"#0e9aa0";
+  return L.divIcon({className:"",html:`<div class="epin" style="--c:${color}"><span>${t.emoji}</span></div>`,iconSize:[30,37],iconAnchor:[15,35],popupAnchor:[0,-32]}); }
 function refreshMap(){
   if(!map) return;
   markerLayer.clearLayers(); lineLayer.clearLayers(); markersById={};
@@ -486,8 +500,7 @@ function refreshMap(){
       n++; const ll=[p.loc.lat,p.loc.lng]; linePts.push(ll);
       const fitOk = !(it.type==="flight" && p.role==="from"); // don't let a far-flung departure airport drive the zoom
       if(fitOk){ allPts.push(ll); if(inDay) emphPts.push(ll); }
-      const color=TYPE_HEX[it.type]||"#0e9aa0";
-      const m=L.marker(ll,{icon:pinIcon(color,n),opacity:focusDayKey&&!inDay?0.32:1}).addTo(markerLayer);
+      const m=L.marker(ll,{icon:pinIcon(it.type),opacity:focusDayKey&&!inDay?0.35:1}).addTo(markerLayer);
       const gmap=`https://www.google.com/maps/search/?api=1&query=${p.loc.lat},${p.loc.lng}`;
       m.bindPopup(`<div class="pop"><div class="pt">${t.emoji} ${esc(it.title||t.label)}</div>`+
         (p.loc.name?`<div class="pa">${esc(p.loc.name)}</div>`:"")+(p.loc.address?`<div class="pa">${esc(p.loc.address)}</div>`:"")+
@@ -792,6 +805,7 @@ function renderSettings(){ const m=state.meta; const keyOn=!!m.mapsKey;
       <div class="field"><label>Home time zone</label><select class="inp" data-set="homeTz">${zoneOptions(m.homeTz)}</select><div class="hint">Used for the “≈ home” times so it’s always clear what time it is back home.</div></div>
       <div class="field"><label>Destination time zone (header clock)</label><select class="inp" data-set="destTz">${zoneOptions(m.destTz)}</select><div class="hint">Bali & Lombok are WITA (UTC+8). Each item can still have its own zone.</div></div>
     </div>
+    <div class="field"><label>Time format</label><select class="inp" data-set="clock"><option value="24"${m.clock!=="12"?" selected":""}>24-hour · 20:45</option><option value="12"${m.clock==="12"?" selected":""}>12-hour · 8:45 pm</option></select></div>
     <div class="field"><label>Google Drive folder link</label><input class="inp" data-set="driveUrl" placeholder="https://drive.google.com/drive/folders/…" value="${esc(m.driveUrl)}"><div class="hint">Shows as a one-tap button on the Documents tab.</div></div>
     <div class="field"><label>Google Maps API key <span class="keystatus ${keyOn?"on":"off"}">${keyOn?"● live data on":"○ using estimates"}</span></label>
       <input class="inp mono" type="password" data-set="mapsKey" placeholder="AIza…" value="${esc(m.mapsKey)}">
@@ -930,11 +944,14 @@ document.addEventListener("click",e=>{
     case "clear": if(confirm("Erase all trip data on this device? (Export first if unsure.)")){ state=blankState(); ui.dayIdx=null; save(); afterLoad(); } break;
   }
 });
-document.addEventListener("input",e=>{ const s=e.target.closest("[data-set]"); if(!s) return; state.meta[s.dataset.set]=s.value.trim(); save(); if(s.dataset.set==="destTz"||s.dataset.set==="homeTz") renderClocks(); });
+document.addEventListener("input",e=>{ const s=e.target.closest("[data-set]"); if(!s) return; state.meta[s.dataset.set]=s.value.trim(); save();
+  if(s.dataset.set==="destTz"||s.dataset.set==="homeTz") renderClocks();
+  if(s.dataset.set==="clock"){ renderClocks(); renderMain(); } });
 document.addEventListener("change",e=>{ const s=e.target.closest("[data-set]"); if(s&&s.dataset.set==="mapsKey"){ googleReady=false; googleLoading=false; legCache.clear(); loadGoogle(); renderSettings(); } });
 document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
 $("#tripSub").addEventListener("input",e=>{ state.meta.sub=e.target.value; save(); });
 $("#fitBtn").addEventListener("click",()=>{ applyMapFocus(null); });
+$("#satBtn").addEventListener("click",toggleSat);
 $("#scrim").addEventListener("click",e=>{ if(e.target.id==="scrim") closeModal(); });
 let _rT; window.addEventListener("resize",()=>{ clearTimeout(_rT); _rT=setTimeout(()=>{ if(map){ map.invalidateSize(); if(!isMobile()||ui.view==="map") refreshMap(); } if(ui.view==="today"){ const p=$("#pager"); if(p) p.scrollLeft=ui.dayIdx*(p.clientWidth||1); } },140); });
 matchMedia("(max-width:859px)").addEventListener?.("change",()=>{ if(!isMobile()&&ui.view==="map") setView("today"); else if(map) setTimeout(()=>{ map.invalidateSize(); refreshMap(); },90); });
