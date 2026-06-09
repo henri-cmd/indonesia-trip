@@ -89,9 +89,11 @@
   .tabbar button{flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 0 7px; color:var(--faint); font-size:10px; font-weight:600; transition:color .15s}
   .tabbar button .ti{font-size:20px; line-height:1; transition:transform .15s var(--ease)}
   .tabbar button .ti{padding:3px 16px; border-radius:20px; transition:background .15s, transform .15s var(--ease)}
+  .tabbar button{position:relative; z-index:1}
   .tabbar button.active{color:var(--ink); font-weight:700}
-  .tabbar button.active .ti{background:var(--accent); transform:translateY(-1px)}
-  .tabbar button:active .ti{transform:scale(.92)}
+  .tabbar button.active .ti{transform:translateY(-1px)}
+  .tabbar button:active .ti{transform:scale(.9)}
+  .tab-ind{position:absolute; top:0; left:0; width:0; height:0; border-radius:15px; background:var(--accent); z-index:0; opacity:0; pointer-events:none; transition:transform .36s cubic-bezier(.3,1.32,.4,1), width .36s cubic-bezier(.3,1.32,.4,1), height .22s var(--ease), opacity .22s}
 
   /* ---------- Section heads / buttons ---------- */
   .sec-head{display:flex; align-items:center; gap:12px; padding:16px 18px; border-bottom:1px solid var(--line); flex-wrap:wrap}
@@ -137,15 +139,15 @@
   .countdown .ct{font-size:13px; color:#d4d8c8}
 
   .tl{position:relative; margin:0 1px}
-  .tl-row{display:grid; grid-template-columns:50px 22px minmax(0,1fr); align-items:stretch}
-  .tl-time{font-size:12.5px; text-align:right; padding-top:13px; color:var(--ink); white-space:nowrap}
+  .tl-row{display:flex; align-items:stretch}
+  .tl-time{flex:0 0 50px; font-size:12.5px; text-align:right; padding-top:13px; color:var(--ink); white-space:nowrap; overflow:hidden; transition:flex-basis .28s var(--ease), opacity .2s}
   .tl-time .z{display:block; font-size:9.5px; color:var(--muted); letter-spacing:.02em}
-  .tl-rail{position:relative}
+  .tl-rail{flex:0 0 22px; position:relative; transition:flex-basis .28s var(--ease), opacity .2s}
   .tl-rail::before{content:""; position:absolute; left:50%; top:0; bottom:0; width:2px; background:var(--line); transform:translateX(-50%)}
   .tl-row:first-child .tl-rail::before{top:14px}
   .tl-row.last .tl-rail::before{height:14px; bottom:auto}
   .tl-dot{position:absolute; left:50%; top:13px; width:13px; height:13px; border-radius:50%; background:var(--c,#999); border:2.5px solid var(--card); transform:translateX(-50%); z-index:1}
-  .tl-card{padding:11px 13px; margin:6px 0 10px; border:1px solid var(--line); border-radius:13px; background:var(--card); transition:border-color .15s, box-shadow .15s}
+  .tl-card{flex:1 1 auto; min-width:0; padding:11px 13px; margin:6px 0 10px; border:1px solid var(--line); border-radius:13px; background:var(--card); transition:border-color .18s var(--ease), box-shadow .18s var(--ease)}
   .tl-card .h{display:flex; align-items:center; gap:8px}
   .tl-card .e{font-size:18px}
   .tl-card .t{font-weight:700; font-size:14.5px; letter-spacing:-.01em; flex:1; min-width:0}
@@ -411,8 +413,8 @@
   .tl-expand{max-height:0; overflow:hidden; opacity:0; transition:max-height .3s var(--ease), opacity .25s, margin .2s}
   .tl-card.expanded .tl-expand{max-height:720px; opacity:1; margin-top:9px}
   /* expanded item goes full-width: collapse the side timeline rail */
-  .tl-row.rowexp{grid-template-columns:1fr}
-  .tl-row.rowexp .tl-time, .tl-row.rowexp .tl-rail{display:none}
+  .tl-row.rowexp .tl-time, .tl-row.rowexp .tl-rail{flex-basis:0; opacity:0; overflow:hidden; pointer-events:none}
+  @keyframes viewfade{from{opacity:0; transform:translateY(7px)} to{opacity:1; transform:none}}
   .loc-brief{display:flex; align-items:center; gap:6px; margin-top:5px; font-size:12.5px; color:var(--muted)}
   .loc-brief .nm{color:var(--ink)}
 </style>
@@ -458,6 +460,7 @@
 </div>
 
 <nav class="tabbar" id="tabbar">
+  <span class="tab-ind" id="tabInd"></span>
   <button data-view="today" class="active"><span class="ti">📅</span><span>Today</span></button>
   <button data-view="itinerary"><span class="ti">🗒️</span><span>Plan</span></button>
   <button data-view="documents"><span class="ti">📁</span><span>Docs</span></button>
@@ -741,21 +744,19 @@ function openDetail(id){
 function closeDetail(){ $("#detail").classList.remove("show"); if(detailMap){ try{detailMap.remove();}catch(e){} detailMap=null; } }
 /* inline expand of a timeline card + sync the map */
 // Idempotent so a double-fire can't toggle it back: body-tap always expands, chevron collapses.
+function cssEsc(s){ return (window.CSS&&CSS.escape)?CSS.escape(s):String(s).replace(/"/g,'\\"'); }
+function setCardExpanded(id,on){ const el=document.querySelector('.tl-card[data-card="'+cssEsc(id)+'"]'); if(!el) return; el.classList.toggle('expanded',on); const row=el.closest('.tl-row'); if(row) row.classList.toggle('rowexp',on); }
 function expandItem(id){
   if(!id) return;
-  if(ui.expandedId===id){ focusItem(id); return; }   // already open — just re-centre the map
+  if(ui.expandedId && ui.expandedId!==id) setCardExpanded(ui.expandedId,false);
   ui.expandedId=id; ui.selId=id;
-  const m=$("#main"), sc=m?m.scrollTop:0;
-  renderToday();                                       // tlRow applies .expanded from ui.expandedId
-  if(m) m.scrollTop=sc;
-  setTimeout(()=>focusItem(id),40);
+  setCardExpanded(id,true);          // CSS transitions animate it — no re-render
+  focusItem(id);
 }
 function collapseItem(){
   if(!ui.expandedId) return;
+  setCardExpanded(ui.expandedId,false);
   ui.expandedId=null;
-  const m=$("#main"), sc=m?m.scrollTop:0;
-  renderToday();
-  if(m) m.scrollTop=sc;
 }
 
 /* ---- passcode lock ---- */
@@ -806,12 +807,22 @@ function renderClocks(){ const now=new Date(); const home=state.meta.homeTz,dest
 function syncHeadH(){ const h=document.querySelector("header.top"); if(h) document.documentElement.style.setProperty("--head-h", Math.round(h.getBoundingClientRect().height)+"px"); }
 
 /* ---- view switching ---- */
+function moveTabInd(){
+  const ind=$("#tabInd"), bar=$("#tabbar"); if(!ind||!bar) return;
+  const active=bar.querySelector("button.active"), ti=active&&(active.querySelector(".ti")||active);
+  if(!ti || getComputedStyle(bar).display==="none"){ ind.style.opacity=0; return; }
+  const br=bar.getBoundingClientRect(), tr=ti.getBoundingClientRect();
+  ind.style.width=tr.width+"px"; ind.style.height=tr.height+"px";
+  ind.style.transform="translate("+Math.round(tr.left-br.left)+"px,"+Math.round(tr.top-br.top)+"px)";
+  ind.style.opacity=1;
+}
 function setView(v){
   ui.view=v; document.body.dataset.view=v;
   document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
   if(v==="itinerary"||v==="documents"||v==="settings") applyMapFocus(null);
   renderMain();
-  syncHeadH();
+  const mc=$("#main"); if(mc){ mc.style.animation="none"; void mc.offsetWidth; mc.style.animation="viewfade .24s var(--ease)"; }
+  moveTabInd(); syncHeadH();
   if(map) setTimeout(()=>{ syncHeadH(); map.invalidateSize(); if(v==="today"||!isMobile()) refreshMap(); },70);
 }
 function renderMain(){
@@ -1225,23 +1236,15 @@ $("#fitBtn").addEventListener("click",()=>{ applyMapFocus(null); });
 $("#satBtn").addEventListener("click",toggleSat);
 function setMapCollapsed(c){ document.body.classList.toggle("map-collapsed", c); localStorage.setItem("indoTrip.mapCollapsed", c?"1":""); if(map) setTimeout(()=>{ try{ map.invalidateSize(); }catch(e){} },300); }
 $("#mapToggle").addEventListener("click",()=>setMapCollapsed(!document.body.classList.contains("map-collapsed")));
-/* gestures: flick up on the map to collapse it; pull down at the top of the list to bring it back */
+/* gesture: pull down at the very top of the list to bring the map back (collapse via the 🗺 button) */
 (function(){
-  const mw=document.querySelector(".mapwrap"), main=$("#main");
-  if(mw){ let sy=0,st=0,on=false;
-    mw.addEventListener("touchstart",e=>{ if(e.touches.length!==1)return; sy=e.touches[0].clientY; st=Date.now(); on=true; },{passive:true});
-    mw.addEventListener("touchend",e=>{ if(!on||!isMobile()||ui.view!=="today")return; on=false;
-      const dy=e.changedTouches[0].clientY-sy, dt=Date.now()-st;
-      if(dy<-55 && dt<420 && !document.body.classList.contains("map-collapsed")) setMapCollapsed(true);
-    },{passive:true});
-  }
-  if(main){ let psy=0,pull=false;
-    main.addEventListener("touchstart",e=>{ if(e.touches.length!==1)return; psy=e.touches[0].clientY; pull = main.scrollTop<=0 && isMobile() && ui.view==="today" && document.body.classList.contains("map-collapsed"); },{passive:true});
-    main.addEventListener("touchmove",e=>{ if(!pull)return; if(e.touches[0].clientY-psy>70){ pull=false; setMapCollapsed(false); } },{passive:true});
-  }
+  const main=$("#main"); if(!main) return;
+  let psy=0,pull=false;
+  main.addEventListener("touchstart",e=>{ if(e.touches.length!==1)return; psy=e.touches[0].clientY; pull = main.scrollTop<=0 && isMobile() && ui.view==="today" && document.body.classList.contains("map-collapsed"); },{passive:true});
+  main.addEventListener("touchmove",e=>{ if(!pull)return; if(e.touches[0].clientY-psy>70){ pull=false; setMapCollapsed(false); } },{passive:true});
 })();
 $("#scrim").addEventListener("click",e=>{ if(e.target.id==="scrim") closeModal(); });
-let _rT; window.addEventListener("resize",()=>{ clearTimeout(_rT); _rT=setTimeout(()=>{ syncHeadH(); if(map){ map.invalidateSize(); if(!isMobile()||ui.view==="map") refreshMap(); } if(ui.view==="today"){ const p=$("#pager"); if(p) p.scrollLeft=ui.dayIdx*(p.clientWidth||1); } },140); });
+let _rT; window.addEventListener("resize",()=>{ clearTimeout(_rT); _rT=setTimeout(()=>{ syncHeadH(); moveTabInd(); if(map){ map.invalidateSize(); if(!isMobile()||ui.view==="map") refreshMap(); } if(ui.view==="today"){ const p=$("#pager"); if(p) p.scrollLeft=ui.dayIdx*(p.clientWidth||1); } },140); });
 matchMedia("(max-width:859px)").addEventListener?.("change",()=>{ if(!isMobile()&&ui.view==="map") setView("today"); else if(map) setTimeout(()=>{ map.invalidateSize(); refreshMap(); },90); });
 
 /* ---- PWA: runtime icon + manifest ---- */
@@ -1265,7 +1268,7 @@ function buildSplash(){ $("#splashWm").innerHTML=[..."INDO 2026"].map((ch,i)=>`<
 function hideSplash(){ const s=$("#splash"); if(s){ s.classList.add("done"); setTimeout(()=>s&&s.remove&&s.remove(),600); } }
 
 /* ---- boot ---- */
-function afterLoad(){ if(state.meta.sub) $("#tripSub").value=state.meta.sub; renderClocks(); renderMain(); refreshMap(); loadGoogle(); syncHeadH(); }
+function afterLoad(){ if(state.meta.sub) $("#tripSub").value=state.meta.sub; renderClocks(); renderMain(); refreshMap(); loadGoogle(); syncHeadH(); setTimeout(moveTabInd,80); }
 buildSplash();
 if(localStorage.getItem("indoTrip.mapCollapsed")) document.body.classList.add("map-collapsed");
 initMap();
