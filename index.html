@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+<meta name="theme-color" content="#14160f" />
+<title>Indonesia · Henri & Elisa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌴</text></svg>">
+<style>
+  :root{
+    --bg:#f5f6f2; --card:#ffffff; --ink:#14160f; --muted:#70756a; --faint:#9aa093;
+    --line:#e7e9e1; --line-strong:#d6d9cd;
+    --accent:#c4f53d; --accent-deep:#5f8b06; --accent-soft:#eef9c9;
+    --blue:#2f6fed; --violet:#7c5cf0; --amber:#e08a00; --green:#11936a; --red:#e0483d; --teal:#0e9aa0; --grey:#7b8071;
+    --shadow:0 1px 2px rgba(20,22,15,.04), 0 6px 20px rgba(20,22,15,.05);
+    --radius:15px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:'DM Sans',system-ui,sans-serif; color:var(--ink); background:var(--bg);
+    -webkit-font-smoothing:antialiased; line-height:1.45; font-size:15px;
+  }
+  .mono{font-family:'DM Mono',ui-monospace,monospace}
+  button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit; font-size:inherit}
+  input,select,textarea{font-family:inherit; font-size:15px; color:var(--ink)}
+  a{color:var(--accent-deep); text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* ---------- Header ---------- */
+  header.top{
+    position:sticky; top:0; z-index:40; background:rgba(245,246,242,.86);
+    backdrop-filter:saturate(150%) blur(10px); border-bottom:1px solid var(--line);
+  }
+  .top-in{max-width:1320px; margin:0 auto; padding:10px 18px; display:flex; align-items:center; gap:16px; flex-wrap:wrap}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:700; font-size:17px; letter-spacing:-.01em}
+  .brand .dot{width:11px;height:11px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .brand input{font-weight:700;font-size:17px;border:none;background:transparent;width:min(42vw,300px);padding:2px 4px;border-radius:8px}
+  .brand input:hover{background:#fff}
+  .brand input:focus{outline:2px solid var(--accent);background:#fff}
+
+  .clocks{display:flex; gap:8px; margin-left:auto; flex-wrap:wrap}
+  .clock{display:flex; flex-direction:column; gap:1px; background:var(--card); border:1px solid var(--line);
+    border-radius:11px; padding:6px 12px; min-width:96px}
+  .clock .lbl{font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); display:flex; gap:5px; align-items:center}
+  .clock .t{font-weight:500; font-size:18px; letter-spacing:-.01em}
+  .clock .sub{font-size:11px; color:var(--faint)}
+  .clock.dest{background:var(--ink); color:#fff; border-color:var(--ink)}
+  .clock.dest .lbl{color:#c7cbbe} .clock.dest .sub{color:#9aa08e}
+
+  nav.tabs{display:flex; gap:4px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:4px}
+  nav.tabs button{padding:7px 14px; border-radius:9px; font-weight:500; color:var(--muted); display:flex; align-items:center; gap:7px; font-size:14px}
+  nav.tabs button.active{background:var(--ink); color:#fff}
+  nav.tabs button:not(.active):hover{background:var(--bg)}
+  .tab-count{font-size:11px; background:var(--accent); color:var(--ink); border-radius:20px; padding:1px 7px; font-weight:700}
+  nav.tabs button.active .tab-count{background:var(--accent)}
+
+  /* ---------- Layout ---------- */
+  .app{max-width:1320px; margin:0 auto; padding:18px; display:grid; grid-template-columns:minmax(0,1fr) 480px; gap:18px; align-items:start}
+  @media (max-width:1040px){ .app{grid-template-columns:1fr; padding:14px} }
+  .panel{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow)}
+
+  .mapwrap{position:sticky; top:84px}
+  @media (max-width:1040px){ .mapwrap{position:static; order:-1} }
+  #map{height:calc(100vh - 120px); min-height:420px; width:100%; border-radius:var(--radius); z-index:1}
+  @media (max-width:1040px){ #map{height:46vh; min-height:320px} }
+  .map-foot{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; border-top:1px solid var(--line); font-size:12.5px; color:var(--muted)}
+  .legend{display:flex; gap:12px; flex-wrap:wrap}
+  .legend span{display:inline-flex; align-items:center; gap:5px}
+  .legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+
+  /* ---------- Section headings / buttons ---------- */
+  .sec-head{display:flex; align-items:center; gap:12px; padding:16px 18px; border-bottom:1px solid var(--line); flex-wrap:wrap}
+  .sec-head h2{margin:0; font-size:16px; font-weight:700; letter-spacing:-.01em}
+  .sec-head .sp{margin-left:auto}
+  .btn{display:inline-flex; align-items:center; gap:7px; padding:9px 15px; border-radius:11px; font-weight:600; font-size:14px;
+    background:var(--ink); color:#fff; border:1px solid var(--ink); transition:transform .04s ease, filter .15s}
+  .btn:hover{filter:brightness(1.12)} .btn:active{transform:translateY(1px)}
+  .btn.lime{background:var(--accent); color:var(--ink); border-color:var(--accent)}
+  .btn.ghost{background:var(--card); color:var(--ink); border-color:var(--line-strong)}
+  .btn.ghost:hover{background:var(--bg); filter:none}
+  .btn.sm{padding:6px 11px; font-size:13px; border-radius:9px; font-weight:500}
+  .btn.danger{background:#fff; color:var(--red); border-color:#f0c6c2}
+  .iconbtn{width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);background:var(--card);color:var(--muted)}
+  .iconbtn:hover{background:var(--bg); color:var(--ink)}
+
+  /* ---------- Itinerary ---------- */
+  .it-body{padding:8px 14px 20px}
+  .daybar{display:flex; align-items:center; gap:10px; margin:18px 4px 8px}
+  .daybar:first-child{margin-top:6px}
+  .daybar .d{font-weight:700; font-size:14px}
+  .daybar .dn{font-size:12px; color:var(--faint); font-weight:500}
+  .daybar .ln{flex:1; height:1px; background:var(--line)}
+  .daybar .dtz{font-size:11px; color:var(--muted); background:var(--bg); border:1px solid var(--line); padding:2px 8px; border-radius:20px}
+
+  .card{position:relative; display:flex; gap:13px; padding:14px; border:1px solid var(--line); border-radius:13px; background:var(--card); margin:8px 0; transition:border-color .15s, box-shadow .15s}
+  .card:hover{border-color:var(--line-strong); box-shadow:var(--shadow)}
+  .card.sel{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft)}
+  .ic{flex:none; width:42px;height:42px;border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:21px; background:var(--bg)}
+  .card .body{flex:1; min-width:0}
+  .card .row1{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+  .card .ttl{font-weight:700; font-size:15.5px; letter-spacing:-.01em}
+  .tag{font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; font-weight:700; padding:2px 8px; border-radius:20px; color:#fff}
+  .when{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:5px 0 2px; font-size:13.5px}
+  .when .time{font-weight:500}
+  .tz{font-size:11px; padding:1px 7px; border-radius:6px; background:var(--accent-soft); color:var(--accent-deep); font-weight:600; letter-spacing:.02em}
+  .home-eq{font-size:12px; color:var(--faint)}
+  .arrow{color:var(--faint)}
+  .zonechg{font-size:11.5px; color:var(--amber); font-weight:600; background:#fff6e6; padding:1px 8px; border-radius:6px; border:1px solid #f6e2bd}
+  .loc{display:flex; align-items:flex-start; gap:7px; margin-top:7px; font-size:13.5px; color:var(--ink)}
+  .loc .pin{color:var(--red); flex:none; margin-top:1px}
+  .loc .addr{color:var(--muted); font-size:12.5px}
+  .loc-actions{display:inline-flex; gap:4px; margin-left:2px; vertical-align:middle}
+  .chiprow{display:flex; gap:6px; flex-wrap:wrap; margin-top:9px}
+  .chip{display:inline-flex; align-items:center; gap:5px; font-size:12px; padding:3px 9px; border-radius:8px; background:var(--bg); border:1px solid var(--line); color:var(--muted)}
+  .chip.doc{cursor:pointer; color:var(--ink)} .chip.doc:hover{border-color:var(--accent-deep); color:var(--accent-deep)}
+  .chip .k{color:var(--faint)}
+  .notes{margin-top:9px; font-size:13px; color:#43463c; background:var(--bg); border:1px dashed var(--line-strong); border-radius:10px; padding:8px 11px; white-space:pre-wrap}
+  .card .edit{position:absolute; top:10px; right:10px; opacity:0; transition:opacity .15s}
+  .card:hover .edit{opacity:1}
+  @media (max-width:1040px){ .card .edit{opacity:1} }
+
+  /* travel leg connector */
+  .leg{display:flex; gap:10px; margin:2px 0 2px 20px; padding-left:24px; border-left:2px dashed var(--line-strong); position:relative}
+  .leg .legcard{flex:1; background:var(--bg); border:1px solid var(--line); border-radius:11px; padding:9px 12px; margin:4px 0; font-size:13px}
+  .leg .lr{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .leg .mode{font-size:15px}
+  .leg b{font-weight:700}
+  .leg .gap{margin-left:auto; font-size:12px; color:var(--muted)}
+  .leg .gap.tight{color:var(--red); font-weight:600}
+  .leg .live{display:flex; gap:14px; flex-wrap:wrap; margin-top:6px; font-size:12.5px}
+  .leg .live .v{font-weight:500}
+  .badge-live{font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--green); background:#e6f6ef; padding:1px 6px; border-radius:5px}
+  .badge-est{font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); background:var(--bg); border:1px solid var(--line); padding:1px 6px; border-radius:5px}
+  .leg-links{display:flex; gap:8px; align-items:center; margin-top:4px}
+  .spin{display:inline-block;width:11px;height:11px;border:2px solid var(--line-strong);border-top-color:var(--accent-deep);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  /* empty state */
+  .empty{text-align:center; padding:48px 24px; color:var(--muted)}
+  .empty .big{font-size:40px; margin-bottom:8px}
+  .empty h3{margin:0 0 6px; color:var(--ink); font-size:18px}
+  .empty .cta{display:flex; gap:10px; justify-content:center; margin-top:18px; flex-wrap:wrap}
+
+  /* ---------- Documents ---------- */
+  .doc-body{padding:14px 18px 20px}
+  .drive{display:flex; align-items:center; gap:12px; padding:14px; border:1px solid var(--line); border-radius:13px; background:linear-gradient(180deg,#fff, var(--bg)); margin-bottom:14px}
+  .drive .gic{width:42px;height:42px;border-radius:11px;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:20px;flex:none}
+  .drive .t{font-weight:700} .drive .s{font-size:12.5px;color:var(--muted)}
+  .doc-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px}
+  .doccard{display:flex; gap:10px; padding:12px; border:1px solid var(--line); border-radius:12px; background:var(--card); position:relative}
+  .doccard:hover{border-color:var(--line-strong); box-shadow:var(--shadow)}
+  .doccard .dic{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;background:var(--bg);flex:none}
+  .doccard .t{font-weight:600; font-size:14px; word-break:break-word}
+  .doccard .cat{font-size:11px; color:var(--muted)}
+  .doccard .x{position:absolute; top:7px; right:7px; opacity:0}
+  .doccard:hover .x{opacity:1}
+
+  /* ---------- Settings ---------- */
+  .set-body{padding:6px 18px 22px}
+  .field{margin:15px 0}
+  .field label{display:block; font-weight:600; font-size:13.5px; margin-bottom:5px}
+  .field .hint{font-size:12px; color:var(--muted); margin-top:4px}
+  .inp{width:100%; padding:10px 12px; border:1px solid var(--line-strong); border-radius:10px; background:#fff}
+  .inp:focus{outline:2px solid var(--accent); border-color:transparent}
+  textarea.inp{resize:vertical; min-height:64px}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  @media(max-width:560px){ .row2{grid-template-columns:1fr} }
+  details.help{margin-top:8px; border:1px solid var(--line); border-radius:10px; background:var(--bg)}
+  details.help summary{cursor:pointer; padding:9px 12px; font-weight:600; font-size:13px; color:var(--accent-deep)}
+  details.help .inner{padding:0 14px 12px; font-size:13px; color:#43463c}
+  details.help ol{margin:6px 0 0; padding-left:20px} details.help li{margin:4px 0}
+  .keystatus{font-size:12.5px; padding:3px 9px; border-radius:20px; font-weight:600}
+  .keystatus.on{background:#e6f6ef; color:var(--green)} .keystatus.off{background:var(--bg); color:var(--muted); border:1px solid var(--line)}
+
+  /* ---------- Modal ---------- */
+  .scrim{position:fixed; inset:0; background:rgba(20,22,15,.42); backdrop-filter:blur(2px); z-index:60; display:none; align-items:flex-start; justify-content:center; padding:24px; overflow:auto}
+  .scrim.show{display:flex}
+  .modal{background:var(--card); border-radius:18px; box-shadow:0 30px 80px rgba(20,22,15,.3); width:min(620px,100%); margin:auto; overflow:hidden}
+  .modal .mh{display:flex; align-items:center; gap:10px; padding:16px 20px; border-bottom:1px solid var(--line)}
+  .modal .mh h3{margin:0; font-size:17px}
+  .modal .mb{padding:6px 20px 20px; max-height:72vh; overflow:auto}
+  .modal .mf{display:flex; gap:10px; padding:14px 20px; border-top:1px solid var(--line); background:var(--bg)}
+  .typegrid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px}
+  @media(max-width:560px){ .typegrid{grid-template-columns:repeat(3,1fr)} }
+  .typebtn{display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 4px; border:1px solid var(--line); border-radius:11px; background:var(--card); font-size:12px; font-weight:500; color:var(--muted)}
+  .typebtn .e{font-size:20px}
+  .typebtn.on{border-color:var(--ink); background:var(--ink); color:#fff}
+  .geo-results{border:1px solid var(--line); border-radius:10px; margin-top:6px; overflow:hidden; display:none}
+  .geo-results.show{display:block}
+  .geo-results button{display:block; width:100%; text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); font-size:13px}
+  .geo-results button:last-child{border-bottom:none}
+  .geo-results button:hover{background:var(--bg)}
+  .loc-pick{font-size:12.5px; color:var(--green); margin-top:6px; display:none}
+  .loc-pick.show{display:flex; align-items:center; gap:6px}
+  .checklist{display:flex; flex-direction:column; gap:6px; max-height:160px; overflow:auto; border:1px solid var(--line); border-radius:10px; padding:8px}
+  .checklist label{display:flex; align-items:center; gap:9px; font-weight:400; font-size:13.5px; padding:3px}
+  .subsec{border:1px solid var(--line); border-radius:12px; padding:12px; margin-top:6px; background:var(--bg)}
+  .subsec h4{margin:0 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted)}
+
+  /* toast */
+  #toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff; padding:11px 18px; border-radius:12px; font-size:14px; font-weight:500; z-index:90; opacity:0; transition:all .25s; pointer-events:none; box-shadow:0 12px 40px rgba(0,0,0,.3)}
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  #toast .ok{color:var(--accent)}
+
+  .hide{display:none !important}
+  .leaflet-popup-content{font-family:'DM Sans',sans-serif; margin:12px 14px}
+  .pop .pt{font-weight:700; font-size:14px}
+  .pop .pa{font-size:12px; color:#555; margin:3px 0 7px}
+  .pop .pactions{display:flex; gap:6px}
+  .pop button, .pop a{font-size:12px; padding:4px 9px; border-radius:7px; border:1px solid var(--line-strong); background:#fff; color:var(--ink); cursor:pointer; display:inline-flex; align-items:center; gap:4px}
+  .marker-num{display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);width:26px;height:26px;box-shadow:0 2px 6px rgba(0,0,0,.3);border:2px solid #fff}
+  .marker-num span{transform:rotate(45deg)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <span class="dot"></span>
+      <input id="tripName" value="Indonesia" aria-label="Trip name" />
+    </div>
+    <div class="clocks" id="clocks"></div>
+    <nav class="tabs" id="tabs">
+      <button data-view="itinerary" class="active">📅 Itinerary <span class="tab-count" id="cItin">0</span></button>
+      <button data-view="documents">📁 Documents <span class="tab-count" id="cDoc">0</span></button>
+      <button data-view="settings">⚙︎</button>
+    </nav>
+  </div>
+</header>
+
+<div class="app">
+  <!-- LEFT: active view -->
+  <main class="panel" id="main"></main>
+
+  <!-- RIGHT: persistent map -->
+  <section class="panel mapwrap">
+    <div id="map"></div>
+    <div class="map-foot">
+      <div class="legend" id="legend"></div>
+      <button class="btn ghost sm" id="fitBtn" style="margin-left:auto">⤢ Fit all stops</button>
+    </div>
+  </section>
+</div>
+
+<!-- Modal host -->
+<div class="scrim" id="scrim"><div class="modal" id="modal"></div></div>
+<div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+/* ============================================================
+   Indonesia trip planner — single-file, vanilla, localStorage
+   ============================================================ */
+"use strict";
+
+/* ---------- constants ---------- */
+const STORE_KEY = "indoTrip.v1";
+const IDN_ZONES = [
+  {tz:"Asia/Makassar", abbr:"WITA", label:"Bali / Lombok / Sulawesi (WITA, UTC+8)"},
+  {tz:"Asia/Jakarta",  abbr:"WIB",  label:"Jakarta / Java / Sumatra (WIB, UTC+7)"},
+  {tz:"Asia/Jayapura", abbr:"WIT",  label:"Papua / Maluku (WIT, UTC+9)"},
+];
+const COMMON_ZONES = [
+  ...IDN_ZONES,
+  {tz:"Europe/London", abbr:"UK",  label:"London (UK)"},
+  {tz:"Asia/Singapore",abbr:"SGT", label:"Singapore"},
+  {tz:"Asia/Dubai",    abbr:"GST", label:"Dubai"},
+  {tz:"Australia/Sydney",abbr:"AEST",label:"Sydney"},
+];
+const TYPES = {
+  flight:  {emoji:"✈️", label:"Flight",   color:"var(--blue)",  legtoo:true},
+  hotel:   {emoji:"🏨", label:"Hotel",    color:"var(--violet)"},
+  transfer:{emoji:"🚗", label:"Transfer", color:"var(--amber)", legtoo:true},
+  activity:{emoji:"🎟️", label:"Activity", color:"var(--green)"},
+  food:    {emoji:"🍜", label:"Food",     color:"var(--red)"},
+  note:    {emoji:"📝", label:"Note",     color:"var(--grey)"},
+  other:   {emoji:"📍", label:"Other",    color:"var(--teal)"},
+};
+const TZ_ABBR = {"Asia/Makassar":"WITA","Asia/Jakarta":"WIB","Asia/Jayapura":"WIT","Asia/Singapore":"SGT","Asia/Dubai":"GST","Australia/Sydney":"AEST"};
+
+/* ---------- state ---------- */
+let state = load();
+let ui = { view:"itinerary", selId:null };
+const legCache = new Map();   // google results, session only
+let googleReady=false, googleLoading=false;
+
+function blankState(){
+  return {
+    meta:{ name:"Indonesia", homeTz:"Europe/London", destTz:"Asia/Makassar", driveUrl:"", mapsKey:"" },
+    items:[], docs:[]
+  };
+}
+function load(){
+  try{ const s = JSON.parse(localStorage.getItem(STORE_KEY)); if(s&&s.meta) return s; }catch(e){}
+  return blankState();
+}
+function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function el(html){ const t=document.createElement("template"); t.innerHTML=html.trim(); return t.content.firstChild; }
+function toast(msg,ok){ const t=$("#toast"); t.innerHTML = (ok?'<span class="ok">✓</span> ':'')+esc(msg); t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),2200); }
+async function copy(text){ try{ await navigator.clipboard.writeText(text); toast("Copied to clipboard",true);}catch(e){ const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); toast("Copied",true);} }
+
+/* timezone math */
+function tzOffsetMin(tz, date){
+  try{
+    const s = new Intl.DateTimeFormat("en-US",{timeZone:tz,timeZoneName:"longOffset"})
+      .formatToParts(date).find(p=>p.type==="timeZoneName").value;
+    const m = s.match(/GMT([+-])(\d{1,2})(?::?(\d{2}))?/);
+    if(!m) return 0;
+    return (m[1]==="-"?-1:1)*(parseInt(m[2],10)*60+parseInt(m[3]||"0",10));
+  }catch(e){ return 0; }
+}
+function wallToInstant(dateStr, timeStr, tz){
+  if(!dateStr) return null;
+  const naive = new Date(`${dateStr}T${(timeStr||"00:00")}:00Z`);
+  let off = tzOffsetMin(tz, naive);
+  let inst = new Date(naive.getTime() - off*60000);
+  const off2 = tzOffsetMin(tz, inst);
+  if(off2!==off) inst = new Date(naive.getTime() - off2*60000);
+  return inst;
+}
+function fmtTime(inst,tz){ return inst? new Intl.DateTimeFormat("en-GB",{timeZone:tz,hour:"2-digit",minute:"2-digit",hour12:false}).format(inst):""; }
+function fmtDateFull(inst,tz){ return inst? new Intl.DateTimeFormat("en-GB",{timeZone:tz,weekday:"long",day:"numeric",month:"long"}).format(inst):""; }
+function fmtDateShort(inst,tz){ return inst? new Intl.DateTimeFormat("en-GB",{timeZone:tz,weekday:"short",day:"numeric",month:"short"}).format(inst):""; }
+function dayKey(inst,tz){ return inst? new Intl.DateTimeFormat("en-CA",{timeZone:tz,year:"numeric",month:"2-digit",day:"2-digit"}).format(inst):""; }
+function tzAbbr(tz){ if(TZ_ABBR[tz]) return TZ_ABBR[tz]; const off=tzOffsetMin(tz,new Date()); return "UTC"+(off>=0?"+":"")+(off/60); }
+function niceAbbr(tz,now){ if(TZ_ABBR[tz]) return TZ_ABBR[tz];
+  try{ const v=new Intl.DateTimeFormat("en-GB",{timeZone:tz,timeZoneName:"short"}).formatToParts(now).find(p=>p.type==="timeZoneName")?.value;
+    if(v && !/^GMT[+-]?\d/.test(v)) return v; }catch(e){}
+  return offsetLabel(tz); }
+function offsetLabel(tz){ const o=tzOffsetMin(tz,new Date()); const h=o/60; return "UTC"+(o>=0?"+":"")+(Number.isInteger(h)?h:h.toFixed(1)); }
+function relOffset(tzA, tzB){ // hours A is ahead of B
+  const d=new Date(); const diff=(tzOffsetMin(tzA,d)-tzOffsetMin(tzB,d))/60;
+  if(diff===0) return "same time as home";
+  return (diff>0?"+":"")+ (Number.isInteger(diff)?diff:diff.toFixed(1)) + "h vs home";
+}
+function durText(ms){
+  if(ms==null||isNaN(ms)) return "";
+  let mins=Math.round(ms/60000); if(mins<1) return "0m";
+  const h=Math.floor(mins/60), m=mins%60;
+  return (h?h+"h ":"")+(m?m+"m":(h?"":"0m"));
+}
+function haversineKm(a,b){
+  const R=6371,toR=x=>x*Math.PI/180;
+  const dLat=toR(b.lat-a.lat),dLng=toR(b.lng-a.lng);
+  const s=Math.sin(dLat/2)**2+Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLng/2)**2;
+  return R*2*Math.asin(Math.sqrt(s));
+}
+
+/* location accessors (flights/transfers carry from/to) */
+function startLoc(it){ return (it.fromLoc&&it.fromLoc.lat!=null)?it.fromLoc:(it.location&&it.location.lat!=null?it.location:null); }
+function endLoc(it){ return (it.toLoc&&it.toLoc.lat!=null)?it.toLoc:(it.location&&it.location.lat!=null?it.location:null); }
+function startTz(it){ return it.tz||state.meta.destTz; }
+function endTz(it){ return it.tz2||it.tz||state.meta.destTz; }
+function startInstant(it){ return wallToInstant(it.date,it.time,startTz(it)); }
+function endInstant(it){ return it.date2? wallToInstant(it.date2,it.time2,endTz(it)) : (it.time2&&it.date? wallToInstant(it.date,it.time2,endTz(it)):null); }
+function sortedItems(){ return [...state.items].sort((a,b)=>{ const ai=startInstant(a),bi=startInstant(b); if(!ai)return 1; if(!bi)return -1; return ai-bi; }); }
+
+/* ---------- map ---------- */
+let map, markerLayer, lineLayer, markersById={};
+function initMap(){
+  map = L.map("map",{zoomControl:true, scrollWheelZoom:true}).setView([-8.55,115.2],9);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{
+    attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19, subdomains:"abcd"
+  }).addTo(map);
+  markerLayer = L.layerGroup().addTo(map);
+  lineLayer = L.layerGroup().addTo(map);
+}
+function pinIcon(color,num){
+  return L.divIcon({className:"", html:`<div class="marker-num" style="background:${color}"><span>${num}</span></div>`, iconSize:[26,26], iconAnchor:[13,26], popupAnchor:[0,-24]});
+}
+function refreshMap(){
+  if(!map) return;
+  markerLayer.clearLayers(); lineLayer.clearLayers(); markersById={};
+  const pts=[]; let n=0; const linePts=[];
+  sortedItems().forEach(it=>{
+    const t=TYPES[it.type]||TYPES.other;
+    const places=[];
+    if(it.fromLoc&&it.fromLoc.lat!=null) places.push({loc:it.fromLoc,role:"from"});
+    if(it.toLoc&&it.toLoc.lat!=null) places.push({loc:it.toLoc,role:"to"});
+    if(!places.length && it.location&&it.location.lat!=null) places.push({loc:it.location,role:"main"});
+    places.forEach(p=>{
+      n++;
+      const ll=[p.loc.lat,p.loc.lng]; pts.push(ll); linePts.push(ll);
+      const m=L.marker(ll,{icon:pinIcon(t.color,n)}).addTo(markerLayer);
+      const gmap=`https://www.google.com/maps/search/?api=1&query=${p.loc.lat},${p.loc.lng}`;
+      m.bindPopup(`<div class="pop"><div class="pt">${t.emoji} ${esc(it.title||t.label)}</div>`+
+        (p.loc.name?`<div class="pa">${esc(p.loc.name)}</div>`:"")+
+        (p.loc.address?`<div class="pa">${esc(p.loc.address)}</div>`:"")+
+        `<div class="pactions"><button onclick="copy('${esc((p.loc.address||p.loc.name||"").replace(/'/g,"\\'"))}')">⧉ Copy</button>`+
+        `<a href="${gmap}" target="_blank" rel="noopener">↗ Maps</a></div></div>`);
+      markersById[it.id+"-"+p.role]=m;
+      if(p.role==="main"||p.role==="to") markersById[it.id]=m;
+    });
+  });
+  if(linePts.length>1) L.polyline(linePts,{color:"#14160f",weight:1.5,opacity:.25,dashArray:"4 6"}).addTo(lineLayer);
+  if(pts.length){ try{ map.fitBounds(L.latLngBounds(pts).pad(.22)); }catch(e){} }
+  // legend
+  const used=[...new Set(state.items.map(i=>i.type))];
+  $("#legend").innerHTML = used.map(ty=>{const t=TYPES[ty]||TYPES.other; return `<span><i style="background:${t.color}"></i>${t.label}</span>`;}).join("") || '<span style="color:var(--faint)">Add a stop to see it on the map</span>';
+}
+function focusItem(id){
+  ui.selId=id; renderMain();
+  const m=markersById[id]; if(m){ map.flyTo(m.getLatLng(),Math.max(map.getZoom(),13),{duration:.6}); setTimeout(()=>m.openPopup(),350); }
+}
+
+/* ---------- Google travel times ---------- */
+function loadGoogle(){
+  const key=state.meta.mapsKey;
+  if(!key || googleReady || googleLoading) return;
+  googleLoading=true;
+  window.__gmapsReady=()=>{ googleReady=true; googleLoading=false; legCache.clear(); if(ui.view==="itinerary") renderMain(); };
+  const s=document.createElement("script");
+  s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&callback=__gmapsReady&loading=async`;
+  s.async=true;
+  s.onerror=()=>{ googleLoading=false; toast("Google Maps couldn’t load — check the key in Settings"); };
+  document.head.appendChild(s);
+}
+function gDirections(o,d,departAt){
+  return new Promise(res=>{
+    if(!googleReady){ res(null); return; }
+    const svc=new google.maps.DirectionsService();
+    const opts={origin:{lat:o.lat,lng:o.lng},destination:{lat:d.lat,lng:d.lng},travelMode:google.maps.TravelMode.DRIVING};
+    if(departAt && departAt.getTime()>Date.now()+60000) opts.drivingOptions={departureTime:departAt,trafficModel:google.maps.TrafficModel.BEST_GUESS};
+    else opts.drivingOptions={departureTime:new Date(Date.now()+60000),trafficModel:google.maps.TrafficModel.BEST_GUESS};
+    svc.route(opts,(r,st)=>{
+      if(st==="OK"&&r.routes[0]){ const leg=r.routes[0].legs[0];
+        res({dist:leg.distance?.text, dur:leg.duration?.text, traffic:leg.duration_in_traffic?.text||null});
+      } else res({error:st});
+    });
+  });
+}
+async function fetchLeg(id,o,d,departInst){
+  if(!googleReady) return;
+  const key=`${o.lat.toFixed(4)},${o.lng.toFixed(4)}>${d.lat.toFixed(4)},${d.lng.toFixed(4)}`;
+  let data=legCache.get(key);
+  if(!data){
+    const now=await gDirections(o,d,new Date());
+    let pred=null;
+    if(departInst && departInst.getTime()>Date.now()+3600000) pred=await gDirections(o,d,departInst);
+    data={now,pred}; legCache.set(key,data);
+  }
+  const box=document.getElementById("leg-"+id); if(!box) return;
+  if(data.now&&data.now.error){ box.innerHTML=`<span class="badge-est">est only</span> <span style="color:var(--muted)">Google: ${esc(data.now.error)}</span>`; return; }
+  let h=`<span class="badge-live">Google live</span> `;
+  if(data.now) h+=`<span class="v">Now: ${esc(data.now.traffic||data.now.dur)}</span>`;
+  if(data.pred&&data.pred.traffic) h+=` <span class="v">· On the day (${fmtTime(departInst,startTz_ofId(id))}): ${esc(data.pred.traffic)}</span>`;
+  if(data.now&&data.now.dist) h+=` <span style="color:var(--faint)">· ${esc(data.now.dist)}</span>`;
+  box.innerHTML=h;
+}
+function startTz_ofId(id){ const it=state.items.find(x=>x.id===id); return it?startTz(it):state.meta.destTz; }
+
+/* ---------- render: header clocks ---------- */
+function renderClocks(){
+  const now=new Date();
+  const home=state.meta.homeTz, dest=state.meta.destTz;
+  const homeAbbr = niceAbbr(home,now);
+  $("#clocks").innerHTML=
+    `<div class="clock"><div class="lbl">🏠 Home</div><div class="t mono">${fmtTime(now,home)}</div><div class="sub">${esc(homeAbbr)} · ${fmtDateShort(now,home)}</div></div>`+
+    `<div class="clock dest"><div class="lbl">🌴 ${esc(tzAbbr(dest))}</div><div class="t mono">${fmtTime(now,dest)}</div><div class="sub">${esc(relOffset(dest,home))} · ${fmtDateShort(now,dest)}</div></div>`;
+}
+
+/* ---------- render: tabs + main ---------- */
+function setView(v){ ui.view=v; document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("active",b.dataset.view===v)); renderMain(); }
+function renderMain(){
+  $("#cItin").textContent=state.items.length;
+  $("#cDoc").textContent=state.docs.length;
+  if(ui.view==="itinerary") renderItinerary();
+  else if(ui.view==="documents") renderDocuments();
+  else renderSettings();
+}
+
+/* ITINERARY */
+function locLineHTML(it,loc,role){
+  if(!loc||(!loc.name&&!loc.address)) return "";
+  const q = loc.lat!=null ? `${loc.lat},${loc.lng}` : encodeURIComponent(loc.address||loc.name);
+  const gmap=`https://www.google.com/maps/search/?api=1&query=${q}`;
+  return `<div class="loc">
+      <span class="pin">📍</span>
+      <span><span style="font-weight:500">${esc(loc.name||"")}</span>${loc.name&&loc.address?"<br>":""}<span class="addr">${esc(loc.address||"")}</span>
+      <span class="loc-actions">
+        <button class="iconbtn" title="Copy address" data-act="copy-loc" data-id="${it.id}" data-role="${role}">⧉</button>
+        ${loc.lat!=null?`<button class="iconbtn" title="Show on map" data-act="focus" data-id="${it.id}">◎</button>`:""}
+        <a class="iconbtn" title="Open in Google Maps" href="${gmap}" target="_blank" rel="noopener">↗</a>
+      </span></span>
+    </div>`;
+}
+function whenHTML(it){
+  const sTz=startTz(it), eTz=endTz(it);
+  const si=startInstant(it), ei=endInstant(it);
+  if(!si) return `<div class="when"><span style="color:var(--faint)">No date set</span></div>`;
+  const homeEq = `<span class="home-eq" title="Your home time">≈ ${fmtTime(si,state.meta.homeTz)} home</span>`;
+  if((TYPES[it.type]||{}).legtoo && it.fromLoc){ // flight/transfer dep→arr
+    const zoneChg = sTz!==eTz;
+    return `<div class="when">
+        <span class="time mono">${fmtTime(si,sTz)}</span><span class="tz">${esc(tzAbbr(sTz))}</span>
+        <span class="arrow">→</span>
+        ${ei?`<span class="time mono">${fmtTime(ei,eTz)}</span><span class="tz">${esc(tzAbbr(eTz))}</span>`:""}
+        ${ei?`<span class="home-eq">· ${durText(ei-si)}</span>`:""}
+        ${zoneChg?`<span class="zonechg">⏱ ${esc(relTz(eTz,sTz))} zone change</span>`:""}
+      </div>`;
+  }
+  let endStr="";
+  if(ei){ const sameDay=dayKey(si,sTz)===dayKey(ei,eTz);
+    endStr = sameDay ? " – "+fmtTime(ei,eTz) : " → "+fmtDateShort(ei,eTz)+" "+fmtTime(ei,eTz); }
+  return `<div class="when">
+      <span class="time mono">${fmtTime(si,sTz)}${endStr}</span>
+      <span class="tz">${esc(tzAbbr(sTz))}</span>
+      ${homeEq}
+    </div>`;
+}
+function relTz(a,b){ const d=new Date(); const diff=(tzOffsetMin(a,d)-tzOffsetMin(b,d))/60; return (diff>0?"+":"")+diff+"h"; }
+
+function itemCard(it){
+  const t=TYPES[it.type]||TYPES.other;
+  const docs=(it.docIds||[]).map(id=>state.docs.find(d=>d.id===id)).filter(Boolean);
+  const sel = ui.selId===it.id ? " sel":"";
+  let locs="";
+  if(it.fromLoc||it.toLoc){ locs=locLineHTML(it,it.fromLoc,"from")+locLineHTML(it,it.toLoc,"to"); }
+  else locs=locLineHTML(it,it.location,"main");
+  return `<div class="card${sel}" data-card="${it.id}">
+    <div class="ic">${t.emoji}</div>
+    <div class="body">
+      <div class="row1"><span class="ttl">${esc(it.title||t.label)}</span>
+        <span class="tag" style="background:${t.color}">${t.label}</span></div>
+      ${whenHTML(it)}
+      ${locs}
+      ${it.conf?`<div class="chiprow"><span class="chip"><span class="k">Ref</span> <span class="mono">${esc(it.conf)}</span>
+        <button class="iconbtn" style="width:22px;height:22px" title="Copy ref" data-act="copy-conf" data-id="${it.id}">⧉</button></span></div>`:""}
+      ${docs.length?`<div class="chiprow">${docs.map(d=>`<span class="chip doc" data-act="opendoc" data-url="${esc(d.url)}">📎 ${esc(d.title)}</span>`).join("")}</div>`:""}
+      ${it.notes?`<div class="notes">${esc(it.notes)}</div>`:""}
+    </div>
+    <button class="iconbtn edit" title="Edit" data-act="edit" data-id="${it.id}">✎</button>
+  </div>`;
+}
+function legHTML(a,b){
+  const o=endLoc(a), d=startLoc(b);
+  if(!o||!d) return "";
+  const km=haversineKm(o,d);
+  if(km<0.2) return ""; // same place — no travel leg worth showing
+  // crude car estimate: bali avg ~32 km/h incl. stops
+  const estMin=Math.max(5,Math.round(km/32*60));
+  // a "gap" only makes sense when leaving a point-in-time event (flight/transfer arrival)
+  const isConnection = !!(TYPES[a.type]||{}).legtoo;
+  const departInst = isConnection ? endInstant(a) : null;
+  const bStart=startInstant(b);
+  const gapMs = (isConnection && departInst && bStart)? (bStart-departInst):null;
+  const tight = gapMs!=null && gapMs < estMin*60000*1.3;
+  const gmapDir=`https://www.google.com/maps/dir/?api=1&origin=${o.lat},${o.lng}&destination=${d.lat},${d.lng}&travelmode=driving`;
+  const id=a.id;
+  // kick off google fetch (async, fills #leg-<id>)
+  if(googleReady) setTimeout(()=>fetchLeg(id,o,d,departInst||bStart),0); else if(state.meta.mapsKey) loadGoogle();
+  return `<div class="leg"><div class="legcard">
+    <div class="lr"><span class="mode">🚗</span>
+      <span><b>${km.toFixed(km<10?1:0)} km</b> to next stop</span>
+      ${gapMs!=null?`<span class="gap${tight?" tight":""}">${tight?"⚠ tight — ":""}${gapMs<0?"overlaps connection":durText(gapMs)+" to connect"}</span>`:""}
+    </div>
+    <div class="live" id="leg-${id}">
+      ${googleReady?'<span class="spin"></span> <span style="color:var(--muted)">fetching live time…</span>'
+        :`<span class="badge-est">estimate</span> <span class="v">~${durText(estMin*60000)} by car</span> <span style="color:var(--faint)">· straight-line ${km.toFixed(1)} km</span>`}
+    </div>
+    <div class="leg-links"><a href="${gmapDir}" target="_blank" rel="noopener">↗ Open route in Google Maps (live + predicted)</a></div>
+  </div></div>`;
+}
+function renderItinerary(){
+  const items=sortedItems();
+  let html=`<div class="sec-head"><h2>Itinerary</h2>
+    <div class="sp"></div>
+    ${items.length?`<button class="btn ghost sm" data-act="addExample" title="Add a sample Bali day">＋ Example</button>`:""}
+    <button class="btn lime" data-act="add">＋ Add item</button></div><div class="it-body">`;
+  if(!items.length){
+    html+=`<div class="empty"><div class="big">🌴</div><h3>Plan your Indonesia trip</h3>
+      <p>Add flights, hotels, transfers and activities.<br>Each one shows on the map with copyable addresses, local times, and live travel times between stops.</p>
+      <div class="cta"><button class="btn lime" data-act="add">＋ Add first item</button>
+      <button class="btn ghost" data-act="addExample">Load a Bali example</button></div></div>`;
+  } else {
+    let lastDay=null;
+    items.forEach((it,i)=>{
+      const si=startInstant(it), tz=startTz(it);
+      const dk = si? dayKey(si,tz):"none";
+      if(dk!==lastDay){
+        lastDay=dk;
+        html+=`<div class="daybar"><span class="d">${si?fmtDateFull(si,tz):"Unscheduled"}</span>
+          <span class="ln"></span>${si?`<span class="dtz">${esc(tzAbbr(tz))}</span>`:""}</div>`;
+      }
+      html+=itemCard(it);
+      const nx=items[i+1];
+      if(nx && endLoc(it) && startLoc(nx)) html+=legHTML(it,nx);
+    });
+  }
+  html+=`</div>`;
+  $("#main").innerHTML=html;
+}
+
+/* DOCUMENTS */
+const DOC_CATS=["Flight","Hotel","Transfer","Insurance","Visa / Passport","Booking","Other"];
+const DOC_ICON={Flight:"✈️",Hotel:"🏨",Transfer:"🚗",Insurance:"🛡️","Visa / Passport":"🛂",Booking:"🎫",Other:"📄"};
+function renderDocuments(){
+  let html=`<div class="sec-head"><h2>Documents</h2><div class="sp"></div>
+    <button class="btn ghost sm" data-act="setDrive">${state.meta.driveUrl?"Edit Drive link":"Add Drive link"}</button>
+    <button class="btn lime" data-act="addDoc">＋ Add document</button></div><div class="doc-body">`;
+  if(state.meta.driveUrl){
+    html+=`<a class="drive" href="${esc(state.meta.driveUrl)}" target="_blank" rel="noopener">
+      <span class="gic">📁</span><span><div class="t">Open Google Drive folder</div>
+      <div class="s">${esc(state.meta.driveUrl.replace(/^https?:\/\//,"").slice(0,52))}…</div></span>
+      <span style="margin-left:auto" class="btn ghost sm">Open ↗</span></a>`;
+  } else {
+    html+=`<div class="drive"><span class="gic">📁</span><span><div class="t">No Drive folder linked yet</div>
+      <div class="s">Paste your shared Google Drive link so all your booking PDFs live here.</div></span>
+      <button class="btn ghost sm" style="margin-left:auto" data-act="setDrive">Add link</button></div>`;
+  }
+  if(state.docs.length){
+    html+=`<div class="doc-grid">`+state.docs.map(d=>`
+      <a class="doccard" href="${esc(d.url)}" target="_blank" rel="noopener">
+        <span class="dic">${DOC_ICON[d.cat]||"📄"}</span>
+        <span><div class="t">${esc(d.title)}</div><div class="cat">${esc(d.cat||"Other")}${d.note?" · "+esc(d.note):""}</div></span>
+        <button class="iconbtn x" title="Delete" data-act="delDoc" data-id="${d.id}" onclick="event.preventDefault()">✕</button>
+      </a>`).join("")+`</div>`;
+  } else {
+    html+=`<div class="empty"><div class="big">📄</div><h3>No documents yet</h3>
+      <p>Add individual links (boarding passes, hotel confirmations, insurance) — or just link the whole Drive folder above.</p>
+      <div class="cta"><button class="btn lime" data-act="addDoc">＋ Add document</button></div></div>`;
+  }
+  html+=`</div>`;
+  $("#main").innerHTML=html;
+}
+
+/* SETTINGS */
+function zoneOptions(sel){ return COMMON_ZONES.map(z=>`<option value="${z.tz}"${z.tz===sel?" selected":""}>${esc(z.label)}</option>`).join(""); }
+function renderSettings(){
+  const m=state.meta;
+  const keyOn=!!m.mapsKey;
+  $("#main").innerHTML=`<div class="sec-head"><h2>Settings</h2></div><div class="set-body">
+    <div class="row2">
+      <div class="field"><label>Home time zone</label>
+        <select class="inp" data-set="homeTz">${zoneOptions(m.homeTz)}</select>
+        <div class="hint">Used for the “≈ home” times so it’s always clear what time it is back home.</div></div>
+      <div class="field"><label>Destination time zone (header clock)</label>
+        <select class="inp" data-set="destTz">${zoneOptions(m.destTz)}</select>
+        <div class="hint">Bali & Lombok are WITA (UTC+8). Each item can still have its own zone.</div></div>
+    </div>
+
+    <div class="field"><label>Google Drive folder link</label>
+      <input class="inp" data-set="driveUrl" placeholder="https://drive.google.com/drive/folders/…" value="${esc(m.driveUrl)}">
+      <div class="hint">Shows as a one-tap button on the Documents tab.</div></div>
+
+    <div class="field"><label>Google Maps API key <span class="keystatus ${keyOn?"on":"off"}">${keyOn?"● live data on":"○ using estimates"}</span></label>
+      <input class="inp mono" type="password" data-set="mapsKey" placeholder="AIza…" value="${esc(m.mapsKey)}">
+      <div class="hint">Unlocks <b>real Google travel times</b> (live + predicted-for-departure-time) inside each leg. Without it you still get distance estimates + one-tap Google Maps route links.</div>
+      <details class="help"><summary>How to get a free key (≈2 min)</summary><div class="inner">
+        <ol>
+          <li>Go to <a href="https://console.cloud.google.com/google/maps-apis/start" target="_blank" rel="noopener">Google Maps Platform → Get started</a> and create/select a project.</li>
+          <li>Enable the <b>Maps JavaScript API</b> and <b>Directions API</b>.</li>
+          <li>Open <b>Credentials → Create credentials → API key</b>, copy it, paste it above.</li>
+          <li>Recommended: under the key’s <b>restrictions</b>, set <i>HTTP referrers</i> to your site URL once we deploy (and <code>localhost</code> for testing).</li>
+        </ol>
+        Google’s free monthly credit easily covers a personal trip. The key lives only in your browser (and, once deployed, in the page — that’s normal for Maps JS keys, which is why the referrer restriction matters).
+      </div></details>
+    </div>
+
+    <div class="field"><label>Backup & share</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn ghost sm" data-act="export">⤓ Export / copy share code</button>
+        <button class="btn ghost sm" data-act="import">⤒ Import data</button>
+        <button class="btn danger sm" data-act="clear">Clear everything</button>
+      </div>
+      <div class="hint">Export gives Elisa a code to load the same itinerary on her phone. (Live two-way sync can be added later.)</div>
+    </div>
+  </div>`;
+}
+
+/* ---------- modal builders ---------- */
+function openModal(html){ $("#modal").innerHTML=html; $("#scrim").classList.add("show"); }
+function closeModal(){ $("#scrim").classList.remove("show"); $("#modal").innerHTML=""; }
+
+let draft=null; // item being edited
+function itemModal(item){
+  draft = item ? JSON.parse(JSON.stringify(item)) : {id:uid(),type:"activity",title:"",date:"",time:"",tz:state.meta.destTz,location:{},docIds:[]};
+  const isLeg = TYPES[draft.type]?.legtoo;
+  const typeBtns=Object.entries(TYPES).map(([k,t])=>`<button type="button" class="typebtn${draft.type===k?" on":""}" data-type="${k}"><span class="e">${t.emoji}</span>${t.label}</button>`).join("");
+  const docChecks=state.docs.length? state.docs.map(d=>`<label><input type="checkbox" data-doc="${d.id}" ${(draft.docIds||[]).includes(d.id)?"checked":""}> ${DOC_ICON[d.cat]||"📄"} ${esc(d.title)}</label>`).join("") : `<span style="color:var(--faint);font-size:13px">No documents yet — add them on the Documents tab.</span>`;
+
+  openModal(`
+    <div class="mh"><h3>${item?"Edit item":"Add to itinerary"}</h3>
+      <button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
+    <div class="mb">
+      <div class="field"><label>Type</label><div class="typegrid" id="typeGrid">${typeBtns}</div></div>
+      <div class="field"><label>Title</label><input class="inp" id="f-title" value="${esc(draft.title)}" placeholder="${isLeg?"e.g. Flight QR1 LHR → DPS":"e.g. Check in · The Legian Seminyak"}"></div>
+
+      <div id="locBlock"></div>
+
+      <div class="row2">
+        <div class="field"><label>${isLeg?"Departure date":"Date"}</label><input class="inp" type="date" id="f-date" value="${esc(draft.date||"")}"></div>
+        <div class="field"><label>${isLeg?"Departure time":"Time"}</label><input class="inp" type="time" id="f-time" value="${esc(draft.time||"")}"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>${isLeg?"Departure zone":"Time zone"}</label><select class="inp" id="f-tz">${zoneOptions(draft.tz||state.meta.destTz)}</select></div>
+        <div class="field"><label>${isLeg?"Arrival zone":"End time zone (optional)"}</label><select class="inp" id="f-tz2"><option value="">— same —</option>${COMMON_ZONES.map(z=>`<option value="${z.tz}"${draft.tz2===z.tz?" selected":""}>${esc(z.label)}</option>`).join("")}</select></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>${isLeg?"Arrival date":"End date (optional)"}</label><input class="inp" type="date" id="f-date2" value="${esc(draft.date2||"")}"></div>
+        <div class="field"><label>${isLeg?"Arrival time":"End time (optional)"}</label><input class="inp" type="time" id="f-time2" value="${esc(draft.time2||"")}"></div>
+      </div>
+
+      <div class="field"><label>Booking / confirmation ref (optional)</label><input class="inp mono" id="f-conf" value="${esc(draft.conf||"")}" placeholder="e.g. ABC123"></div>
+      <div class="field"><label>Notes (optional)</label><textarea class="inp" id="f-notes" placeholder="Anything useful — terminal, room type, what to bring…">${esc(draft.notes||"")}</textarea></div>
+      <div class="field"><label>Attach documents</label><div class="checklist">${docChecks}</div></div>
+    </div>
+    <div class="mf">
+      ${item?`<button class="btn danger" data-act="delItem" data-id="${draft.id}">Delete</button>`:""}
+      <div style="margin-left:auto;display:flex;gap:10px">
+        <button class="btn ghost" data-act="closeModal">Cancel</button>
+        <button class="btn lime" data-act="saveItem">${item?"Save changes":"Add to trip"}</button>
+      </div>
+    </div>`);
+  renderLocBlock();
+  // type switching
+  $("#typeGrid").addEventListener("click",e=>{ const b=e.target.closest(".typebtn"); if(!b)return;
+    draft.type=b.dataset.type; collectItemForm(); itemModal(draft); });
+}
+function locFieldHTML(prefix,label,loc){
+  loc=loc||{};
+  return `<div class="subsec"><h4>${label}</h4>
+    <div style="display:flex;gap:8px">
+      <input class="inp" id="${prefix}-q" placeholder="Search place or address…" value="${esc(loc.name||"")}">
+      <button class="btn ghost sm" type="button" data-geo="${prefix}">Search</button>
+    </div>
+    <div class="geo-results" id="${prefix}-res"></div>
+    <div class="loc-pick ${loc.lat!=null?"show":""}" id="${prefix}-pick">📍 <span id="${prefix}-picktxt">${esc(loc.address||loc.name||"")}</span> ${loc.lat!=null?`<span class="mono" style="color:var(--faint)">(${(+loc.lat).toFixed(3)}, ${(+loc.lng).toFixed(3)})</span>`:""}</div>
+    <input class="inp" id="${prefix}-addr" placeholder="Address (editable)" value="${esc(loc.address||"")}" style="margin-top:8px">
+    <div class="hint" style="margin-top:6px">Tip: you can paste a Google Maps link in the search box to grab its pin.</div>
+  </div>`;
+}
+function renderLocBlock(){
+  const isLeg=TYPES[draft.type]?.legtoo;
+  if(isLeg){
+    $("#locBlock").innerHTML = locFieldHTML("from","From",draft.fromLoc)+locFieldHTML("to","To",draft.toLoc);
+  } else {
+    $("#locBlock").innerHTML = locFieldHTML("main","Location",draft.location);
+  }
+}
+async function doGeocode(prefix){
+  const q=$("#"+prefix+"-q").value.trim(); if(!q) return;
+  // google maps url paste?
+  const coords=parseLatLng(q);
+  if(coords){ setLoc(prefix,{name:q.length>40?"Pinned location":q,address:"",lat:coords.lat,lng:coords.lng}); return; }
+  const res=$("#"+prefix+"-res"); res.innerHTML='<button disabled>Searching…</button>'; res.classList.add("show");
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(q)}`,{headers:{"Accept":"application/json"}});
+    const arr=await r.json();
+    if(!arr.length){ res.innerHTML='<button disabled>No matches — type an address or paste coordinates</button>'; return; }
+    res.innerHTML=arr.map(a=>`<button type="button" data-lat="${a.lat}" data-lng="${a.lon}" data-name="${esc((a.display_name||"").split(",")[0])}" data-addr="${esc(a.display_name||"")}">📍 ${esc(a.display_name)}</button>`).join("");
+    res.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
+      setLoc(prefix,{name:b.dataset.name,address:b.dataset.addr,lat:+b.dataset.lat,lng:+b.dataset.lng});
+      res.classList.remove("show");
+    }));
+  }catch(e){ res.innerHTML='<button disabled>Search failed — check connection or enter manually</button>'; }
+}
+function parseLatLng(s){
+  let m=s.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || s.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || s.match(/^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/) || s.match(/q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  return m? {lat:+m[1],lng:+m[2]} : null;
+}
+function setLoc(prefix,loc){
+  $("#"+prefix+"-q").value=loc.name||"";
+  $("#"+prefix+"-addr").value=loc.address||"";
+  const pick=$("#"+prefix+"-pick"); pick.classList.add("show");
+  $("#"+prefix+"-picktxt").textContent=loc.address||loc.name||"";
+  draft._tmp=draft._tmp||{}; draft._tmp[prefix]=loc;
+}
+function collectItemForm(){
+  if(!$("#f-title")) return;
+  draft.title=$("#f-title").value.trim();
+  draft.date=$("#f-date").value; draft.time=$("#f-time").value;
+  draft.date2=$("#f-date2").value; draft.time2=$("#f-time2").value;
+  draft.tz=$("#f-tz").value; draft.tz2=$("#f-tz2").value;
+  draft.conf=$("#f-conf").value.trim(); draft.notes=$("#f-notes").value;
+  draft.docIds=[...document.querySelectorAll("[data-doc]")].filter(c=>c.checked).map(c=>c.dataset.doc);
+  // locations: merge picked tmp + manual address edits
+  const grab=(prefix)=>{
+    const qEl=$("#"+prefix+"-q"); if(!qEl) return null;
+    const picked=(draft._tmp&&draft._tmp[prefix])||{};
+    const name=qEl.value.trim(); const addr=$("#"+prefix+"-addr").value.trim();
+    const o={name,address:addr};
+    if(picked.lat!=null){ o.lat=picked.lat; o.lng=picked.lng; if(!o.name)o.name=picked.name; }
+    return (o.name||o.address||o.lat!=null)?o:null;
+  };
+  if(TYPES[draft.type]?.legtoo){ draft.fromLoc=grab("from"); draft.toLoc=grab("to"); draft.location=null; }
+  else { draft.location=grab("main"); draft.fromLoc=null; draft.toLoc=null; }
+}
+function saveItem(){
+  collectItemForm();
+  if(!draft.title){ toast("Give it a title first"); return; }
+  delete draft._tmp;
+  const i=state.items.findIndex(x=>x.id===draft.id);
+  if(i>=0) state.items[i]=draft; else state.items.push(draft);
+  save(); closeModal(); refreshMap(); renderMain(); toast("Saved",true);
+}
+
+function docModal(){
+  openModal(`<div class="mh"><h3>Add document</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
+  <div class="mb">
+    <div class="field"><label>Title</label><input class="inp" id="d-title" placeholder="e.g. Qatar Airways boarding pass"></div>
+    <div class="field"><label>Link (Google Drive, PDF, booking URL…)</label><input class="inp" id="d-url" placeholder="https://…"></div>
+    <div class="row2">
+      <div class="field"><label>Category</label><select class="inp" id="d-cat">${DOC_CATS.map(c=>`<option>${c}</option>`).join("")}</select></div>
+      <div class="field"><label>Note (optional)</label><input class="inp" id="d-note" placeholder="e.g. both passengers"></div>
+    </div>
+  </div>
+  <div class="mf"><div style="margin-left:auto;display:flex;gap:10px">
+    <button class="btn ghost" data-act="closeModal">Cancel</button>
+    <button class="btn lime" data-act="saveDoc">Add document</button></div></div>`);
+}
+function saveDoc(){
+  const title=$("#d-title").value.trim(), url=$("#d-url").value.trim();
+  if(!title||!url){ toast("Title and link required"); return; }
+  state.docs.push({id:uid(),title,url:/^https?:/.test(url)?url:"https://"+url,cat:$("#d-cat").value,note:$("#d-note").value.trim()});
+  save(); closeModal(); renderMain(); toast("Document added",true);
+}
+function driveModal(){
+  openModal(`<div class="mh"><h3>Google Drive folder</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
+  <div class="mb"><div class="field"><label>Shared folder link</label>
+    <input class="inp" id="drv" value="${esc(state.meta.driveUrl)}" placeholder="https://drive.google.com/drive/folders/…">
+    <div class="hint">Make sure it’s shared so Elisa can open it too (Share → Anyone with the link).</div></div></div>
+  <div class="mf"><div style="margin-left:auto;display:flex;gap:10px">
+    <button class="btn ghost" data-act="closeModal">Cancel</button>
+    <button class="btn lime" data-act="saveDrive">Save link</button></div></div>`);
+}
+
+/* export / import */
+function exportData(){
+  const code=btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+  openModal(`<div class="mh"><h3>Share / backup</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
+  <div class="mb">
+    <div class="field"><label>Share code</label>
+      <textarea class="inp mono" id="exp" style="min-height:120px" readonly>${esc(code)}</textarea>
+      <div class="hint">Send this to Elisa. She opens the app → Settings → Import → pastes it.</div></div>
+    <div style="display:flex;gap:10px"><button class="btn lime sm" data-act="copyExp">⧉ Copy code</button>
+      <button class="btn ghost sm" data-act="downloadExp">⤓ Download file</button></div>
+  </div>`);
+}
+function importData(){
+  openModal(`<div class="mh"><h3>Import data</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
+  <div class="mb"><div class="field"><label>Paste share code</label>
+    <textarea class="inp mono" id="imp" style="min-height:120px" placeholder="Paste the code…"></textarea>
+    <div class="hint">This replaces what’s currently on this device.</div></div></div>
+  <div class="mf"><div style="margin-left:auto;display:flex;gap:10px">
+    <button class="btn ghost" data-act="closeModal">Cancel</button>
+    <button class="btn lime" data-act="doImport">Import</button></div></div>`);
+}
+
+/* ---------- global click handler ---------- */
+document.addEventListener("click",e=>{
+  const a=e.target.closest("[data-act]");
+  const card=e.target.closest("[data-card]");
+  if(card && !a){ focusItem(card.dataset.card); return; }
+  if(!a) return;
+  const act=a.dataset.act, id=a.dataset.id;
+  switch(act){
+    case "add": itemModal(null); break;
+    case "edit": itemModal(state.items.find(x=>x.id===id)); break;
+    case "saveItem": saveItem(); break;
+    case "delItem": if(confirm("Delete this item?")){ state.items=state.items.filter(x=>x.id!==id); save(); closeModal(); refreshMap(); renderMain(); toast("Deleted",true);} break;
+    case "closeModal": closeModal(); break;
+    case "focus": focusItem(id); break;
+    case "copy-loc": { const it=state.items.find(x=>x.id===id); const role=a.dataset.role;
+      const loc= role==="from"?it.fromLoc: role==="to"?it.toLoc: it.location; copy(loc.address||loc.name||""); break; }
+    case "copy-conf": { const it=state.items.find(x=>x.id===id); copy(it.conf||""); break; }
+    case "opendoc": window.open(a.dataset.url,"_blank","noopener"); break;
+    case "addExample": loadExample(); break;
+    case "addDoc": docModal(); break;
+    case "saveDoc": saveDoc(); break;
+    case "delDoc": if(confirm("Remove this document?")){ state.docs=state.docs.filter(d=>d.id!==id); state.items.forEach(it=>it.docIds=(it.docIds||[]).filter(x=>x!==id)); save(); renderMain(); } break;
+    case "setDrive": driveModal(); break;
+    case "saveDrive": state.meta.driveUrl=$("#drv").value.trim(); save(); closeModal(); renderMain(); toast("Drive link saved",true); break;
+    case "export": exportData(); break;
+    case "copyExp": copy($("#exp").value); break;
+    case "downloadExp": { const blob=new Blob([$("#exp").value],{type:"text/plain"}); const u=URL.createObjectURL(blob); const x=document.createElement("a"); x.href=u; x.download="indonesia-trip-backup.txt"; x.click(); URL.revokeObjectURL(u); break; }
+    case "import": importData(); break;
+    case "doImport": { try{ const obj=JSON.parse(decodeURIComponent(escape(atob($("#imp").value.trim())))); if(!obj.meta) throw 0; state=obj; save(); closeModal(); afterLoad(); toast("Imported",true);}catch(err){ toast("That code didn’t parse"); } break; }
+    case "clear": if(confirm("Erase all trip data on this device? (Export first if unsure.)")){ state=blankState(); save(); afterLoad(); } break;
+  }
+  // geocode buttons
+  const g=e.target.closest("[data-geo]"); if(g) doGeocode(g.dataset.geo);
+});
+// settings live inputs
+document.addEventListener("input",e=>{
+  const s=e.target.closest("[data-set]"); if(!s) return;
+  const k=s.dataset.set; state.meta[k]=s.value.trim(); save();
+  if(k==="mapsKey"){ /* reload on key change handled on blur */ }
+  if(k==="destTz"||k==="homeTz") renderClocks();
+});
+document.addEventListener("change",e=>{
+  const s=e.target.closest("[data-set]"); if(!s) return;
+  if(s.dataset.set==="mapsKey"){ googleReady=false; googleLoading=false; legCache.clear(); loadGoogle(); renderSettings(); }
+});
+$("#tripName").addEventListener("input",e=>{ state.meta.name=e.target.value; document.title=e.target.value+" · Henri & Elisa"; save(); });
+$("#tabs").addEventListener("click",e=>{ const b=e.target.closest("button[data-view]"); if(b) setView(b.dataset.view); });
+$("#fitBtn").addEventListener("click",()=>refreshMap());
+$("#scrim").addEventListener("click",e=>{ if(e.target.id==="scrim") closeModal(); });
+window.addEventListener("resize",()=>{ if(map) map.invalidateSize(); });
+
+/* ---------- example data ---------- */
+function loadExample(){
+  const ex=[
+    {id:uid(),type:"flight",title:"Flight · London → Denpasar (Bali)",date:"2026-07-01",time:"21:35",tz:"Europe/London",date2:"2026-07-02",time2:"22:55",tz2:"Asia/Makassar",conf:"QR-7HX2",notes:"1 stop Doha (DOH) · 2h layover. Window seats 24A/B.",
+      fromLoc:{name:"London Heathrow (LHR)",address:"Longford TW6, UK",lat:51.4700,lng:-0.4543},
+      toLoc:{name:"Ngurah Rai Intl (DPS)",address:"Tuban, Kuta, Badung Regency, Bali",lat:-8.7467,lng:115.1671}},
+    {id:uid(),type:"transfer",title:"Airport pickup → Seminyak",date:"2026-07-02",time:"23:30",tz:"Asia/Makassar",conf:"BALICAB-119",notes:"Driver Putu waiting at arrivals with name sign.",
+      fromLoc:{name:"Ngurah Rai Intl (DPS)",address:"Tuban, Kuta, Bali",lat:-8.7467,lng:115.1671},
+      toLoc:{name:"The Legian Seminyak",address:"Jl. Kayu Aya, Seminyak, Bali",lat:-8.6916,lng:115.1561}},
+    {id:uid(),type:"hotel",title:"The Legian Seminyak (2 nights)",date:"2026-07-02",time:"23:55",tz:"Asia/Makassar",date2:"2026-07-04",time2:"11:00",conf:"LGN-558210",notes:"Ocean suite. Breakfast included. Late checkout requested.",
+      location:{name:"The Legian Seminyak",address:"Jl. Kayu Aya, Seminyak, Bali 80361",lat:-8.6916,lng:115.1561}},
+    {id:uid(),type:"activity",title:"Uluwatu Temple + Kecak fire dance",date:"2026-07-03",time:"16:30",tz:"Asia/Makassar",notes:"Sunset show 18:00. Cover knees/shoulders. Watch the monkeys!",
+      location:{name:"Uluwatu Temple",address:"Pecatu, South Kuta, Badung Regency, Bali",lat:-8.8291,lng:115.0849}},
+    {id:uid(),type:"transfer",title:"Drive to Ubud",date:"2026-07-04",time:"11:30",tz:"Asia/Makassar",
+      fromLoc:{name:"The Legian Seminyak",address:"Seminyak, Bali",lat:-8.6916,lng:115.1561},
+      toLoc:{name:"Ubud",address:"Ubud, Gianyar Regency, Bali",lat:-8.5069,lng:115.2625}},
+    {id:uid(),type:"activity",title:"Tegallalang Rice Terraces",date:"2026-07-05",time:"08:00",tz:"Asia/Makassar",notes:"Go early to beat crowds + heat. Jungle swing nearby.",
+      location:{name:"Tegallalang Rice Terraces",address:"Tegallalang, Gianyar Regency, Bali",lat:-8.4312,lng:115.2773}},
+  ];
+  state.items.push(...ex);
+  if(!state.meta.driveUrl) state.meta.driveUrl="";
+  save(); refreshMap(); renderMain(); toast("Loaded a Bali example — edit or delete freely",true);
+}
+
+/* ---------- boot ---------- */
+function afterLoad(){
+  $("#tripName").value=state.meta.name||"Indonesia";
+  document.title=(state.meta.name||"Indonesia")+" · Henri & Elisa";
+  renderClocks(); renderMain(); refreshMap(); loadGoogle();
+}
+initMap();
+afterLoad();
+renderClocks(); setInterval(renderClocks,1000*20);
+setTimeout(()=>{ if(map) map.invalidateSize(); },200);
+</script>
+</body>
+</html>
