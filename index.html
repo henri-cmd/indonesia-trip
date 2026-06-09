@@ -388,6 +388,30 @@
     body[data-view="today"] .map-foot{position:absolute; top:auto; bottom:9px; right:9px; left:auto; width:auto; background:transparent; border:none; backdrop-filter:none; padding:0; gap:6px; flex-direction:column; align-items:flex-end}
     body[data-view="today"] .map-foot .btn{margin:0; background:rgba(255,255,255,.93); backdrop-filter:blur(8px); box-shadow:0 2px 8px rgba(0,0,0,.2); border-color:transparent}
   }
+
+  /* collapsible date selector */
+  .todayhead{position:sticky; top:0; z-index:6; background:var(--card)}
+  .datebar{display:flex; align-items:center; gap:10px; padding:14px 16px 8px; background:var(--card)}
+  .datemain{display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; flex:1; text-align:left; padding:0}
+  .datemain .dbig{font-size:21px; font-weight:700; letter-spacing:-.015em}
+  .datemain .dsub{color:var(--muted); font-size:12.5px}
+  .datemain .dtz{font-size:10.5px; color:var(--accent-deep); background:var(--accent-soft); padding:2px 8px; border-radius:20px; font-weight:600}
+  .datemain .chev{color:var(--faint); font-size:12px; transition:transform .22s var(--ease)}
+  .datebar.open .chev{transform:rotate(180deg)}
+  .gotoday{width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:var(--card); color:var(--accent-deep); font-size:15px; display:flex; align-items:center; justify-content:center; flex:none}
+  .gotoday:hover{background:var(--bg)} .gotoday:active{transform:scale(.92)}
+  .daystrip{max-height:98px; overflow:hidden; transition:max-height .28s var(--ease), opacity .2s, padding .28s; border-bottom:1px solid var(--line)}
+  .daystrip.collapsed{max-height:0 !important; padding-top:0 !important; padding-bottom:0 !important; opacity:0; border-bottom:none}
+
+  /* inline expand of an itinerary item */
+  .tl-card{cursor:pointer}
+  .tl-card .h .chev{color:var(--faint); font-size:12px; transition:transform .22s var(--ease)}
+  .tl-card.expanded .h .chev{transform:rotate(180deg)}
+  .tl-card.expanded{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft)}
+  .tl-expand{max-height:0; overflow:hidden; opacity:0; transition:max-height .3s var(--ease), opacity .25s, margin .2s}
+  .tl-card.expanded .tl-expand{max-height:720px; opacity:1; margin-top:9px}
+  .loc-brief{display:flex; align-items:center; gap:6px; margin-top:5px; font-size:12.5px; color:var(--muted)}
+  .loc-brief .nm{color:var(--ink)}
 </style>
 </head>
 <body data-view="today">
@@ -490,10 +514,11 @@ const TYPE_HEX = {flight:"#2f6fed",hotel:"#7c5cf0",transfer:"#e08a00",activity:"
 const TZ_ABBR = {"Asia/Makassar":"WITA","Asia/Jakarta":"WIB","Asia/Jayapura":"WIT","Asia/Singapore":"SGT","Asia/Dubai":"GST","Australia/Sydney":"AEST"};
 
 let state = load();
-let ui = { view:"today", selId:null, dayIdx:null };
+let ui = { view:"today", selId:null, dayIdx:null, expandedId:null };
 const legCache = new Map();
 let googleReady=false, googleLoading=false;
 let focusDayKey=null;
+let pagerCtl=null;
 
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyCx7aFjR2ZemktMeebmqjTMuSuX05q4oJc",
@@ -692,6 +717,15 @@ function openDetail(id){
   },60);
 }
 function closeDetail(){ $("#detail").classList.remove("show"); if(detailMap){ try{detailMap.remove();}catch(e){} detailMap=null; } }
+/* inline expand of a timeline card + sync the map */
+function toggleExpand(cardEl,id){
+  const open = ui.expandedId===id;
+  ui.expandedId = open?null:id;
+  document.querySelectorAll(".tl-card.expanded").forEach(c=>c.classList.remove("expanded"));
+  if(!open){ cardEl.classList.add("expanded"); ui.selId=id; focusItem(id);
+    setTimeout(()=>cardEl.scrollIntoView({block:"nearest",behavior:"smooth"}),140); }
+  else ui.selId=null;
+}
 
 /* ---- passcode lock ---- */
 function hashCode(s){ let h=5381; for(let i=0;i<s.length;i++) h=((h*33)^s.charCodeAt(i))>>>0; return "h"+h.toString(36); }
@@ -783,10 +817,23 @@ function renderToday(){
   }
   if(ui.dayIdx==null||ui.dayIdx>=days.length) ui.dayIdx=currentDayIndex(days);
   const todayKey=dayKey(new Date(),state.meta.destTz);
+  const cur=days[ui.dayIdx];
   const pills=days.map((d,i)=>`<button class="daypill ${i===ui.dayIdx?"active":""} ${d.key===todayKey?"istoday":""}" data-day="${i}">
       <span class="dw">${esc(fmtWeekday(d.instant,d.tz))}</span><span class="dd">${esc(fmtDayNum(d.instant,d.tz))}</span><span class="tdot"></span></button>`).join("");
   const pages=days.map((d,i)=>dayPage(d,i,days.length,todayKey)).join("");
-  $("#main").innerHTML=`<div class="daystrip" id="daystrip">${pills}</div>
+  $("#main").innerHTML=`
+    <div class="todayhead">
+      <div class="datebar" id="datebar">
+        <button class="datemain" data-act="togglePills">
+          <span class="dbig" id="dbDate">${esc(fmtDateFull(cur.instant,cur.tz))}</span>
+          <span class="chev">▾</span>
+          <span class="dsub" id="dbSub">Day ${ui.dayIdx+1} of ${days.length}</span>
+          <span class="dtz" id="dbTz">${esc(tzAbbr(cur.tz))}</span>
+        </button>
+        <button class="gotoday" data-act="goToday" title="Go to current day">⊙</button>
+      </div>
+      <div class="daystrip collapsed" id="daystrip">${pills}</div>
+    </div>
     <div class="pager" id="pager">${pages}</div>`;
   setupPager(days);
 }
@@ -821,9 +868,7 @@ function dayPage(d,idx,total,todayKey){
     rows.splice(rowIdx,0,{html:`<div class="nowline"><span class="lbl"><span class="pulse"></span>NOW ${fmtTime(new Date(),state.meta.destTz)}</span><span class="ln"></span></div>`});
   }
   const body = items.length? `<div class="tl">${rows.map(r=>r.html).join("")}</div>` : `<div class="freeday">🌴 No plans — free day</div>`;
-  return `<div class="daypage" data-page="${idx}">
-    <div class="daytitle"><span class="dbig">${esc(fmtDateFull(d.instant,d.tz))}</span><span class="dsub">Day ${idx+1} of ${total}</span><span class="dtz">${esc(tzAbbr(d.tz))}</span></div>
-    ${countdown}${body}</div>`;
+  return `<div class="daypage" data-page="${idx}">${countdown}${body}</div>`;
 }
 function tlRow(it,isLast){
   const t=TYPES[it.type]||TYPES.other; const sTz=startTz(it),eTz=endTz(it); const si=startInstant(it),ei=endInstant(it);
@@ -832,26 +877,26 @@ function tlRow(it,isLast){
   const badge = it._st==="now"?'<span class="stat now">Now</span>':it._st==="next"?'<span class="stat next">Up next</span>':"";
   const isLeg=(TYPES[it.type]||{}).legtoo && it.fromLoc;
   let timeHtml = si?`${fmtTime(si,sTz)}<span class="z">${esc(tzAbbr(sTz))}</span>`:`–`;
-  const loc = isLeg?null:(it.location);
-  const fromTo = isLeg?`${esc(it.fromLoc?.name||"")} → ${esc(it.toLoc?.name||"")}`:"";
-  let locHtml="";
-  if(isLeg){ locHtml=`<div class="loc">✈️ <span class="nm">${fromTo}</span></div>`; }
-  else if(loc&&(loc.name||loc.address)){
-    locHtml=`<div class="loc"><span style="color:var(--red)">📍</span><span class="nm">${esc(loc.name||loc.address)}</span>
-      <span class="mini">
-        <button class="iconbtn" title="Copy address" data-act="copy-loc" data-id="${it.id}" data-role="main">⧉</button>
-        ${loc.lat!=null?`<button class="iconbtn" title="Show on map" data-act="focus" data-id="${it.id}">◎</button>`:""}
-      </span></div>`;
-  }
+  const brief = isLeg ? `${esc(it.fromLoc?.name||"")} → ${esc(it.toLoc?.name||"")}`
+    : (it.location&&(it.location.name||it.location.address)) ? esc(it.location.name||it.location.address) : "";
+  const docs=(it.docIds||[]).map(x=>state.docs.find(d=>d.id===x)).filter(Boolean);
+  const locsFull = isLeg ? (locLineHTML(it,it.fromLoc,"from")+locLineHTML(it,it.toLoc,"to")) : locLineHTML(it,it.location,"main");
+  const homeEq = si ? `<div class="home-eq" style="margin-top:6px">≈ ${fmtTime(si,state.meta.homeTz)} your time${(isLeg&&ei&&sTz!==eTz)?` · ${esc(relTz(eTz,sTz))} zone change`:""}</div>` : "";
+  const expand = `<div class="tl-expand">
+      ${locsFull||""}
+      ${homeEq}
+      ${it.conf?`<div class="ref" style="margin-top:8px">Booking ref <span class="mono">${esc(it.conf)}</span> <button class="iconbtn" style="width:22px;height:22px;vertical-align:-5px" data-act="copy-conf" data-id="${it.id}">⧉</button></div>`:""}
+      ${it.notes?`<div class="note">${esc(it.notes)}</div>`:""}
+      ${docs.length?`<div class="chiprow" style="margin-top:8px">${docs.map(d=>`<span class="chip doc" data-act="opendoc" data-url="${esc(d.url)}">📎 ${esc(d.title)}</span>`).join("")}</div>`:""}
+      <div style="margin-top:12px"><button class="btn lime sm" data-act="edit" data-id="${it.id}">✎ Edit</button></div>
+    </div>`;
   return {__item:true, html:`<div class="tl-row ${isLast?"last":""}">
     <div class="tl-time mono">${timeHtml}${ei&&isLeg?`<br>${fmtTime(ei,eTz)}<span class="z">${esc(tzAbbr(eTz))}</span>`:""}</div>
     <div class="tl-rail"><span class="tl-dot" style="--c:${color}"></span></div>
-    <div class="tl-card ${cls}" data-card="${it.id}">
-      <div class="h"><span class="e">${t.emoji}</span><span class="t">${esc(it.title||t.label)}</span>${badge}
-        <button class="iconbtn" title="Edit" data-act="edit" data-id="${it.id}">✎</button></div>
-      ${locHtml}
-      ${it.conf?`<div class="ref">Ref <span class="mono">${esc(it.conf)}</span></div>`:""}
-      ${it.notes?`<div class="note">${esc(it.notes)}</div>`:""}
+    <div class="tl-card ${cls} ${it.id===ui.expandedId?'expanded':''}" data-card="${it.id}">
+      <div class="h"><span class="e">${t.emoji}</span><span class="t">${esc(it.title||t.label)}</span>${badge}<span class="chev">▾</span></div>
+      ${brief?`<div class="loc-brief">📍 <span class="nm">${brief}</span></div>`:""}
+      ${expand}
     </div></div>`};
 }
 function tlLeg(lg){
@@ -863,30 +908,28 @@ function tlLeg(lg){
       · <a href="${lg.gmapDir}" target="_blank" rel="noopener">route ↗</a></div></div>`,
     __leg:true, lg};
 }
+function updateDateBar(days,i){ const d=days[i]; if(!d) return; const D=$("#dbDate"),S=$("#dbSub"),T=$("#dbTz"); if(D)D.textContent=fmtDateFull(d.instant,d.tz); if(S)S.textContent="Day "+(i+1)+" of "+days.length; if(T)T.textContent=tzAbbr(d.tz); }
 function setupPager(days){
   const pager=$("#pager"), strip=$("#daystrip"); if(!pager) return;
   const w=()=>pager.clientWidth||1;
+  const sync=i=>{ document.querySelectorAll(".daypill").forEach((q,j)=>q.classList.toggle("active",j===i)); applyMapFocus(days[i]?.key||null); updateDateBar(days,i);
+    if(googleReady) days[i]?.items.forEach((it,k)=>{ const lg=legInfo(it,days[i].items[k+1]); if(lg) fetchLeg(lg.id,lg.o,lg.d,lg.departInst); }); };
   // smooth scrollTo fights scroll-snap:mandatory — disable snap during the animation
-  const setTo=(i,smooth)=>{ i=Math.max(0,Math.min(days.length-1,i));
+  const setTo=(i,smooth)=>{ i=Math.max(0,Math.min(days.length-1,i)); ui.dayIdx=i;
     if(smooth){ pager.style.scrollSnapType="none"; pager.scrollTo({left:i*w(),behavior:"smooth"}); clearTimeout(pager._snapT); pager._snapT=setTimeout(()=>{pager.style.scrollSnapType="";},500); }
-    else pager.scrollLeft=i*w(); };
+    else pager.scrollLeft=i*w();
+    sync(i); };
+  pagerCtl={setTo, days};
   requestAnimationFrame(()=>setTo(ui.dayIdx,false));
-  applyMapFocus(days[ui.dayIdx]?.key||null);
-  // kick google for any legs on screen
   if(state.meta.mapsKey && !googleReady) loadGoogle();
-  if(googleReady) days[ui.dayIdx]?.items.forEach((it,i)=>{ const lg=legInfo(it,days[ui.dayIdx].items[i+1]); if(lg) fetchLeg(lg.id,lg.o,lg.d,lg.departInst); });
   let raf;
   pager.onscroll=()=>{ cancelAnimationFrame(raf); raf=requestAnimationFrame(()=>{
     const i=Math.round(pager.scrollLeft/w()); if(i!==ui.dayIdx && i>=0 && i<days.length){ ui.dayIdx=i;
-      document.querySelectorAll(".daypill").forEach((p,j)=>p.classList.toggle("active",j===i));
       const ap=document.querySelectorAll(".daypill")[i]; ap?.scrollIntoView({inline:"center",block:"nearest",behavior:"smooth"});
-      applyMapFocus(days[i].key);
-      if(googleReady) days[i].items.forEach((it,k)=>{ const lg=legInfo(it,days[i].items[k+1]); if(lg) fetchLeg(lg.id,lg.o,lg.d,lg.departInst); });
+      sync(i);
     }
   }); };
-  strip.querySelectorAll(".daypill").forEach(p=>p.addEventListener("click",()=>{ const i=+p.dataset.day; ui.dayIdx=i;
-    document.querySelectorAll(".daypill").forEach((q,j)=>q.classList.toggle("active",j===i));
-    applyMapFocus(days[i]?.key||null); setTo(i,true); }));
+  strip.querySelectorAll(".daypill").forEach(p=>p.addEventListener("click",()=>{ setTo(+p.dataset.day,true); strip.classList.add("collapsed"); $("#datebar")?.classList.remove("open"); }));
   if(map) setTimeout(()=>{ try{ map.invalidateSize(); }catch(e){} },60);
 }
 
@@ -1105,11 +1148,16 @@ function loadExample(){ const ex=[
 /* ---- global handlers ---- */
 document.addEventListener("click",e=>{
   const a=e.target.closest("[data-act]"); const card=e.target.closest("[data-card]");
-  if(card&&!a){ openDetail(card.dataset.card); return; }
+  if(card&&!a){ if(e.target.closest("a")) return;
+    if(card.classList.contains("tl-card")) toggleExpand(card, card.dataset.card);
+    else focusItem(card.dataset.card);
+    return; }
   const g=e.target.closest("[data-geo]"); if(g){ doGeocode(g.dataset.geo); return; }
   if(!a) return; const act=a.dataset.act,id=a.dataset.id;
   switch(act){
     case "add": itemModal(null); break;
+    case "togglePills": { const s=$("#daystrip"); if(s){ s.classList.toggle("collapsed"); $("#datebar")?.classList.toggle("open", !s.classList.contains("collapsed")); } break; }
+    case "goToday": { if(pagerCtl){ pagerCtl.setTo(currentDayIndex(pagerCtl.days),true); $("#daystrip")?.classList.add("collapsed"); $("#datebar")?.classList.remove("open"); } break; }
     case "edit": closeDetail(); itemModal(state.items.find(x=>x.id===id)); break;
     case "closeDetail": closeDetail(); break;
     case "setPass": { const v=($("#passInput").value||"").trim(); if(!v){ toast("Type a code first"); break; } state.meta.passHash=hashCode(v); save(); pushMeta(); localStorage.setItem("indoTrip.unlock", state.meta.passHash); renderSettings(); toast("Passcode set",true); break; }
