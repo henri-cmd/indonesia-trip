@@ -10,7 +10,7 @@ Built to feel like an iOS app — on iPhone, open in Safari → Share → **Add 
 - **Map** — every located stop pinned, with one-tap copyable addresses and "open in Google Maps" links. On desktop the map sits beside the itinerary; on mobile it's its own tab.
 - **Travel times** — distance + drive estimate between consecutive stops, plus a one-tap Google Maps route link (live + predicted). Add a Google Maps API key in **Settings** to pull real Google live/predicted times into each leg.
 - **Documents** — link the shared Google Drive folder and individual booking PDFs; attach them to itinerary items.
-- **Sharing** — data is saved in your browser (localStorage). **Settings → Export** gives a share code to load the same trip on another device.
+- **Live sync** — the trip syncs in real time between devices (Firebase Realtime Database, anonymous auth, per-trip data tree keyed by an unguessable trip id). Send the invite link from **Settings** to add Elisa; her edits appear on your phone within ~a second. A localStorage cache keeps it working offline, and there's still an export/backup code.
 
 ## Tech
-Everything lives in `index.html` — no build step. Dependencies (via CDN): Leaflet for the map, DM Sans / DM Mono fonts. The app icon and web-app manifest are generated at runtime, so it stays a single file.
+Everything lives in `index.html` — no build step. Dependencies (via CDN): Leaflet for the map, Firebase compat SDK for sync, DM Sans / DM Mono fonts. The app icon and web-app manifest are generated at runtime, so it stays a single file. The Firebase web config is public by design — data is protected by the database security rules + the unguessable trip id in the invite link.

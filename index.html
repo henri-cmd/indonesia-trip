@@ -385,6 +385,10 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script>
 "use strict";
 /* ============ INDO 2026 — single-file trip planner ============ */
@@ -420,10 +424,68 @@ const legCache = new Map();
 let googleReady=false, googleLoading=false;
 let focusDayKey=null;
 
-function blankState(){ return { meta:{ sub:"Henri & Elisa", homeTz:"Europe/London", destTz:"Asia/Makassar", driveUrl:"", mapsKey:"", clock:"24" }, items:[], docs:[] }; }
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCx7aFjR2ZemktMeebmqjTMuSuX05q4oJc",
+  authDomain: "indo-2026-8ec76.firebaseapp.com",
+  databaseURL: "https://indo-2026-8ec76-default-rtdb.firebaseio.com",
+  projectId: "indo-2026-8ec76",
+  storageBucket: "indo-2026-8ec76.firebasestorage.app",
+  messagingSenderId: "106406719360",
+  appId: "1:106406719360:web:2c5970e787cf9a67295b65"
+};
+let fdb=null, fauth=null, fstore=null, tripRef=null, tripId=null, syncStatus="off";
+function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
+
+function blankState(){ return { meta:{ sub:"Henri & Elisa", homeTz:"Europe/London", destTz:"Asia/Makassar", driveUrl:"", mapsKey:"", clock:"24" }, items:[], docs:[], hotspots:[] }; }
 function load(){ try{ const s=JSON.parse(localStorage.getItem(STORE_KEY)); if(s&&s.meta) return s; }catch(e){} return blankState(); }
 function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+/* ---------- live sync (Firebase Realtime Database) ---------- */
+function getTripId(){
+  const h=(location.hash||"").match(/[#&]t=([\w-]+)/);
+  let id = h?h[1]:localStorage.getItem("indoTrip.tripId");
+  if(!id) id = (window.crypto&&crypto.randomUUID)?crypto.randomUUID():(uid()+uid()+uid());
+  localStorage.setItem("indoTrip.tripId", id);
+  if(!h && history.replaceState){ try{ history.replaceState(null,"","#t="+id); }catch(e){} }
+  return id;
+}
+function inviteLink(){ return location.origin+location.pathname+"#t="+(tripId||getTripId()); }
+function setSyncStatus(s){ syncStatus=s; const b=$("#syncBadge"); if(b){ b.className="keystatus "+(s==="on"?"on":"off"); b.textContent=s==="on"?"● live":s==="connecting"?"… connecting":s==="error"?"⚠ check connection":"○ offline"; } }
+function initFirebase(){
+  if(typeof firebase==="undefined"){ setSyncStatus("off"); return; }
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    fauth=firebase.auth(); fdb=firebase.database(); try{ fstore=firebase.storage(); }catch(e){}
+    tripId=getTripId(); setSyncStatus("connecting");
+    fauth.onAuthStateChanged(u=>{ if(u) connectTrip(); });
+    fauth.signInAnonymously().catch(()=>setSyncStatus("error"));
+  }catch(e){ setSyncStatus("off"); }
+}
+function connectTrip(){
+  if(tripRef) return;
+  tripRef=fdb.ref("trips/"+tripId);
+  tripRef.once("value").then(snap=>{
+    if(!snap.exists() && (state.items.length||state.docs.length||(state.hotspots||[]).length)) pushAll();
+  }).catch(()=>{}).finally(()=>{ tripRef.on("value", onRemote); setSyncStatus("on"); });
+}
+function onRemote(snap){
+  const v=snap.val(); if(!v){ return; }
+  if(v.meta) state.meta=Object.assign(blankState().meta, v.meta);
+  state.items = v.items?Object.values(v.items):[];
+  state.docs = v.docs?Object.values(v.docs):[];
+  state.hotspots = v.hotspots?Object.values(v.hotspots):[];
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  if($("#tripSub") && document.activeElement!==$("#tripSub") && state.meta.sub) $("#tripSub").value=state.meta.sub;
+  renderClocks(); renderMain(); refreshMap();
+}
+function pushAll(){ if(!tripRef) return; const items={},docs={},hs={};
+  state.items.forEach(i=>items[i.id]=i); state.docs.forEach(d=>docs[d.id]=d); (state.hotspots||[]).forEach(h=>hs[h.id]=h);
+  tripRef.set({meta:state.meta, items, docs, hotspots:hs}).catch(()=>{}); }
+function syncSet(path,val){ if(tripRef) tripRef.child(path).set(val).catch(()=>{}); }
+function syncRemove(path){ if(tripRef) tripRef.child(path).remove().catch(()=>{}); }
+function pushItems(){ const items={}; state.items.forEach(i=>items[i.id]=i); syncSet("items", items); }
+const pushMeta = debounce(()=>syncSet("meta", state.meta), 400);
 
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
@@ -817,13 +879,17 @@ function renderSettings(){ const m=state.meta; const keyOn=!!m.mapsKey;
         <li>Recommended: restrict the key to HTTP referrer <code>henri-cmd.github.io/*</code> (and <code>localhost</code> for testing).</li>
       </ol>Google’s free monthly credit easily covers a personal trip.</div></details>
     </div>
-    <div class="field"><label>Backup & share</label><div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn ghost sm" data-act="export">⤓ Export / share code</button>
-      <button class="btn ghost sm" data-act="import">⤒ Import data</button>
-      <button class="btn danger sm" data-act="clear">Clear everything</button></div>
-      <div class="hint">Export gives Elisa a code to load the same itinerary on her phone. (Live two-way sync can be added later.)</div></div>
+    <div class="field"><label>Live sync <span class="keystatus off" id="syncBadge">○ offline</span></label>
+      <div class="hint">Your trip syncs live between devices. Send Elisa the invite link and she'll see everything — and every edit — in real time on her phone.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn lime sm" data-act="invite">🔗 Copy invite link for Elisa</button>
+        <button class="btn ghost sm" data-act="export">⤓ Backup code</button>
+        <button class="btn ghost sm" data-act="import">⤒ Import</button>
+        <button class="btn danger sm" data-act="clear">Clear everything</button>
+      </div></div>
     <div class="field"><label>Install</label><div class="hint">On iPhone: Safari → Share → <b>Add to Home Screen</b> to launch INDO 2026 full-screen like a real app.</div></div>
   </div>`;
+  setSyncStatus(syncStatus);
 }
 
 /* ====================== MODALS ====================== */
@@ -884,14 +950,14 @@ function collectItemForm(){ if(!$("#f-title")) return;
 }
 function saveItem(){ collectItemForm(); if(!draft.title){ toast("Give it a title first"); return; } delete draft._tmp;
   const i=state.items.findIndex(x=>x.id===draft.id); if(i>=0) state.items[i]=draft; else state.items.push(draft);
-  save(); closeModal(); refreshMap(); renderMain(); toast("Saved",true); }
+  save(); syncSet("items/"+draft.id, draft); closeModal(); refreshMap(); renderMain(); toast("Saved",true); }
 function docModal(){ openModal(`<div class="mh"><h3>Add document</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
   <div class="mb"><div class="field"><label>Title</label><input class="inp" id="d-title" placeholder="e.g. Qatar Airways boarding pass"></div>
     <div class="field"><label>Link (Google Drive, PDF, booking URL…)</label><input class="inp" id="d-url" placeholder="https://…"></div>
     <div class="row2"><div class="field"><label>Category</label><select class="inp" id="d-cat">${DOC_CATS.map(c=>`<option>${c}</option>`).join("")}</select></div><div class="field"><label>Note (optional)</label><input class="inp" id="d-note" placeholder="e.g. both passengers"></div></div></div>
   <div class="mf"><div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn lime" data-act="saveDoc">Add</button></div></div>`); }
 function saveDoc(){ const title=$("#d-title").value.trim(),url=$("#d-url").value.trim(); if(!title||!url){ toast("Title and link required"); return; }
-  state.docs.push({id:uid(),title,url:/^https?:/.test(url)?url:"https://"+url,cat:$("#d-cat").value,note:$("#d-note").value.trim()}); save(); closeModal(); renderMain(); toast("Document added",true); }
+  const d={id:uid(),title,url:/^https?:/.test(url)?url:"https://"+url,cat:$("#d-cat").value,note:$("#d-note").value.trim()}; state.docs.push(d); save(); syncSet("docs/"+d.id,d); closeModal(); renderMain(); toast("Document added",true); }
 function driveModal(){ openModal(`<div class="mh"><h3>Google Drive folder</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
   <div class="mb"><div class="field"><label>Shared folder link</label><input class="inp" id="drv" value="${esc(state.meta.driveUrl)}" placeholder="https://drive.google.com/drive/folders/…"><div class="hint">Share it (Anyone with the link) so Elisa can open it too.</div></div></div>
   <div class="mf"><div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn lime" data-act="saveDrive">Save</button></div></div>`); }
@@ -912,7 +978,7 @@ function loadExample(){ const ex=[
   {id:uid(),type:"food",title:"Dinner · La Lucciola",date:"2026-07-03",time:"20:00",tz:"Asia/Makassar",notes:"Beachfront. Booked under Henri.",location:{name:"La Lucciola",address:"Jl. Petitenget, Seminyak, Bali",lat:-8.6790,lng:115.1560}},
   {id:uid(),type:"transfer",title:"Drive to Ubud",date:"2026-07-04",time:"11:30",tz:"Asia/Makassar",fromLoc:{name:"The Legian Seminyak",address:"Seminyak, Bali",lat:-8.6916,lng:115.1561},toLoc:{name:"Ubud",address:"Ubud, Gianyar Regency, Bali",lat:-8.5069,lng:115.2625}},
   {id:uid(),type:"activity",title:"Tegallalang Rice Terraces",date:"2026-07-05",time:"08:00",tz:"Asia/Makassar",notes:"Go early to beat crowds + heat. Jungle swing nearby.",location:{name:"Tegallalang Rice Terraces",address:"Tegallalang, Gianyar Regency, Bali",lat:-8.4312,lng:115.2773}},
-]; state.items.push(...ex); ui.dayIdx=null; save(); refreshMap(); renderMain(); toast("Loaded a Bali example — edit or delete freely",true); }
+]; state.items.push(...ex); ui.dayIdx=null; save(); pushAll(); refreshMap(); renderMain(); toast("Loaded a Bali example — edit or delete freely",true); }
 
 /* ---- global handlers ---- */
 document.addEventListener("click",e=>{
@@ -924,7 +990,7 @@ document.addEventListener("click",e=>{
     case "add": itemModal(null); break;
     case "edit": itemModal(state.items.find(x=>x.id===id)); break;
     case "saveItem": saveItem(); break;
-    case "delItem": if(confirm("Delete this item?")){ state.items=state.items.filter(x=>x.id!==id); save(); closeModal(); refreshMap(); renderMain(); toast("Deleted",true);} break;
+    case "delItem": if(confirm("Delete this item?")){ state.items=state.items.filter(x=>x.id!==id); save(); syncRemove("items/"+id); closeModal(); refreshMap(); renderMain(); toast("Deleted",true);} break;
     case "closeModal": closeModal(); break;
     case "focus": focusItem(id); break;
     case "copy-loc": { const it=state.items.find(x=>x.id===id),role=a.dataset.role; const loc=role==="from"?it.fromLoc:role==="to"?it.toLoc:it.location; copy(loc.address||loc.name||""); break; }
@@ -933,23 +999,24 @@ document.addEventListener("click",e=>{
     case "addExample": loadExample(); break;
     case "addDoc": docModal(); break;
     case "saveDoc": saveDoc(); break;
-    case "delDoc": if(confirm("Remove this document?")){ state.docs=state.docs.filter(d=>d.id!==id); state.items.forEach(it=>it.docIds=(it.docIds||[]).filter(x=>x!==id)); save(); renderMain(); } break;
+    case "delDoc": if(confirm("Remove this document?")){ state.docs=state.docs.filter(d=>d.id!==id); state.items.forEach(it=>it.docIds=(it.docIds||[]).filter(x=>x!==id)); save(); syncRemove("docs/"+id); pushItems(); renderMain(); } break;
+    case "invite": copy(inviteLink()); toast("Invite link copied — send it to Elisa",true); break;
     case "setDrive": driveModal(); break;
-    case "saveDrive": state.meta.driveUrl=$("#drv").value.trim(); save(); closeModal(); renderMain(); toast("Drive link saved",true); break;
+    case "saveDrive": state.meta.driveUrl=$("#drv").value.trim(); save(); syncSet("meta",state.meta); closeModal(); renderMain(); toast("Drive link saved",true); break;
     case "export": exportData(); break;
     case "copyExp": copy($("#exp").value); break;
     case "downloadExp": { const blob=new Blob([$("#exp").value],{type:"text/plain"}); const u=URL.createObjectURL(blob); const x=document.createElement("a"); x.href=u; x.download="indo-2026-backup.txt"; x.click(); URL.revokeObjectURL(u); break; }
     case "import": importData(); break;
-    case "doImport": { try{ const obj=JSON.parse(decodeURIComponent(escape(atob($("#imp").value.trim())))); if(!obj.meta) throw 0; state=obj; ui.dayIdx=null; save(); closeModal(); afterLoad(); toast("Imported",true);}catch(err){ toast("That code didn’t parse"); } break; }
-    case "clear": if(confirm("Erase all trip data on this device? (Export first if unsure.)")){ state=blankState(); ui.dayIdx=null; save(); afterLoad(); } break;
+    case "doImport": { try{ const obj=JSON.parse(decodeURIComponent(escape(atob($("#imp").value.trim())))); if(!obj.meta) throw 0; state=obj; ui.dayIdx=null; save(); closeModal(); afterLoad(); pushAll(); toast("Imported",true);}catch(err){ toast("That code didn’t parse"); } break; }
+    case "clear": if(confirm("Erase all trip data? This clears it on BOTH your and Elisa's devices. (Export a backup first if unsure.)")){ state=blankState(); ui.dayIdx=null; save(); if(tripRef) tripRef.set({meta:state.meta, items:{}, docs:{}, hotspots:{}}); afterLoad(); } break;
   }
 });
-document.addEventListener("input",e=>{ const s=e.target.closest("[data-set]"); if(!s) return; state.meta[s.dataset.set]=s.value.trim(); save();
+document.addEventListener("input",e=>{ const s=e.target.closest("[data-set]"); if(!s) return; state.meta[s.dataset.set]=s.value.trim(); save(); pushMeta();
   if(s.dataset.set==="destTz"||s.dataset.set==="homeTz") renderClocks();
   if(s.dataset.set==="clock"){ renderClocks(); renderMain(); } });
 document.addEventListener("change",e=>{ const s=e.target.closest("[data-set]"); if(s&&s.dataset.set==="mapsKey"){ googleReady=false; googleLoading=false; legCache.clear(); loadGoogle(); renderSettings(); } });
 document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
-$("#tripSub").addEventListener("input",e=>{ state.meta.sub=e.target.value; save(); });
+$("#tripSub").addEventListener("input",e=>{ state.meta.sub=e.target.value; save(); pushMeta(); });
 $("#fitBtn").addEventListener("click",()=>{ applyMapFocus(null); });
 $("#satBtn").addEventListener("click",toggleSat);
 $("#scrim").addEventListener("click",e=>{ if(e.target.id==="scrim") closeModal(); });
@@ -981,6 +1048,7 @@ function afterLoad(){ if(state.meta.sub) $("#tripSub").value=state.meta.sub; ren
 buildSplash();
 initMap();
 afterLoad();
+initFirebase();
 setInterval(renderClocks,1000*20);
 setInterval(()=>{ if(ui.view==="today"){ const days=tripDays(); if(days[ui.dayIdx]?.key===dayKey(new Date(),state.meta.destTz)) renderToday(); } },60000);
 document.fonts?.ready.then(setupPWA); setupPWA();
