@@ -551,7 +551,11 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r10";
+const APP_BUILD = "10 Jun 2026 · r11";
+// Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
+// A user-entered key in Settings overrides it.
+const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
+function getMapsKey(){ return ((state.meta.mapsKey||"").trim()) || DEFAULT_MAPS_KEY; }
 const IDN_ZONES = [
   {tz:"Asia/Makassar", abbr:"WITA", label:"Bali / Lombok / Sulawesi (WITA, UTC+8)"},
   {tz:"Asia/Jakarta",  abbr:"WIB",  label:"Jakarta / Java / Sumatra (WIB, UTC+7)"},
@@ -845,7 +849,7 @@ function checkLock(){ const el=$("#lock"); if(!el) return; if(isLocked()){ el.cl
 function tryUnlock(){ const v=($("#lockInput").value||"").trim(); if(hashCode(v)===state.meta.passHash){ localStorage.setItem("indoTrip.unlock", state.meta.passHash); $("#lockErr").textContent=""; $("#lock").classList.remove("show"); } else { $("#lockErr").textContent="Wrong code — try again"; $("#lockInput").value=""; } }
 
 /* ---- google travel times ---- */
-function loadGoogle(){ const key=state.meta.mapsKey; if(!key||googleReady||googleLoading) return; googleLoading=true;
+function loadGoogle(){ const key=getMapsKey(); if(!key||googleReady||googleLoading) return; googleLoading=true;
   window.__gmapsReady=()=>{ googleReady=true; googleLoading=false; legCache.clear(); if(ui.view==="itinerary"||ui.view==="today") renderMain(); };
   const s=document.createElement("script"); s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&callback=__gmapsReady&loading=async`; s.async=true;
   s.onerror=()=>{ googleLoading=false; toast("Google Maps couldn’t load — check the key in Settings"); }; document.head.appendChild(s);
@@ -1046,7 +1050,7 @@ function setupPager(days){
   const setTo=(i,anim)=>{ i=Math.max(0,Math.min(days.length-1,i)); ui.dayIdx=i; place(i, anim!==false); sync(i); };
   pagerCtl={setTo, days};
   place(ui.dayIdx,false); sync(ui.dayIdx);
-  if(state.meta.mapsKey && !googleReady) loadGoogle();
+  if(getMapsKey() && !googleReady) loadGoogle();
   // Gestures attached to the PAGER (a Today-only element, recreated each render) — NOT #main —
   // so other views' inputs (e.g. Settings dropdowns) are never affected by these listeners.
   // Horizontal = finger-following day change; pull-down at the top = bring the map back.
@@ -1104,7 +1108,7 @@ function itemCard(it){ const t=TYPES[it.type]||TYPES.other; const docs=(it.docId
 }
 function legHTML(a,b){ const lg=legInfo(a,b); if(!lg) return "";
   const tight=lg.gapMs!=null && lg.gapMs<lg.estMin*60000*1.3;
-  if(googleReady) setTimeout(()=>fetchLeg(lg.id,lg.o,lg.d,lg.departInst),0); else if(state.meta.mapsKey) loadGoogle();
+  if(googleReady) setTimeout(()=>fetchLeg(lg.id,lg.o,lg.d,lg.departInst),0); else if(getMapsKey()) loadGoogle();
   return `<div class="leg"><div class="legcard">
     <div class="lr"><span class="mode">🚗</span><span><b>${lg.km.toFixed(lg.km<10?1:0)} km</b> to next stop</span>
       ${lg.gapMs!=null?`<span class="gap${tight?" tight":""}">${tight?"⚠ tight — ":""}${lg.gapMs<0?"overlaps connection":durText(lg.gapMs)+" to connect"}</span>`:""}</div>
@@ -1325,7 +1329,7 @@ function hsFocus(id){ const h=(state.hotspots||[]).find(x=>x.id===id); if(!h||!h
 
 /* ====================== SETTINGS ====================== */
 function zoneOptions(sel){ return COMMON_ZONES.map(z=>`<option value="${z.tz}"${z.tz===sel?" selected":""}>${esc(z.label)}</option>`).join(""); }
-function renderSettings(){ const m=state.meta; const keyOn=!!m.mapsKey;
+function renderSettings(){ const m=state.meta; const ownKey=!!(m.mapsKey||"").trim(); const keyOn=!!getMapsKey();
   $("#main").innerHTML=`<div class="sec-head"><h2>Settings</h2></div><div class="set-body">
     <div class="row2">
       <div class="field"><label>Home time zone</label><select class="inp" data-set="homeTz">${zoneOptions(m.homeTz)}</select><div class="hint">Used for the “≈ home” times so it’s always clear what time it is back home.</div></div>
@@ -1334,8 +1338,8 @@ function renderSettings(){ const m=state.meta; const keyOn=!!m.mapsKey;
     <div class="field"><label>Time format</label><select class="inp" data-set="clock"><option value="24"${m.clock!=="12"?" selected":""}>24-hour · 20:45</option><option value="12"${m.clock==="12"?" selected":""}>12-hour · 8:45 pm</option></select></div>
     <div class="field"><label>Google Drive folder link</label><input class="inp" data-set="driveUrl" placeholder="https://drive.google.com/drive/folders/…" value="${esc(m.driveUrl)}"><div class="hint">Shows as a one-tap button on the Documents tab.</div></div>
     <div class="field"><label>Google Maps API key <span class="keystatus ${keyOn?"on":"off"}">${keyOn?"● live data on":"○ using estimates"}</span></label>
-      <input class="inp mono" type="password" data-set="mapsKey" placeholder="AIza…" value="${esc(m.mapsKey)}">
-      <div class="hint">Unlocks <b>real Google travel times</b> (live + predicted) inside each leg. Without it you still get distance estimates + one-tap Google Maps route links.</div>
+      <input class="inp mono" type="password" data-set="mapsKey" placeholder="${ownKey?'AIza…':'Built-in key active — leave blank'}" value="${esc(m.mapsKey)}">
+      <div class="hint">${ownKey?"Using your own key.":"A <b>built-in key</b> is active, so live Google travel times are on for both of you — nothing to enter."} Leave blank to use the built-in one; paste your own here to override.</div>
       <details class="help"><summary>How to get a free key (≈2 min)</summary><div class="inner"><ol>
         <li>Go to <a href="https://console.cloud.google.com/google/maps-apis/start" target="_blank" rel="noopener">Google Maps Platform → Get started</a> and create/select a project.</li>
         <li>Enable the <b>Maps JavaScript API</b> and <b>Directions API</b>.</li>
