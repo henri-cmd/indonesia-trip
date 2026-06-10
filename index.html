@@ -89,7 +89,7 @@
   .legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
 
   /* ---------- Bottom tab bar (mobile only) ---------- */
-  .tabbar{position:fixed; left:0; right:0; bottom:0; z-index:50; display:none; justify-content:space-around;
+  .tabbar{position:fixed; left:0; right:0; bottom:calc(0px - var(--vv-gap,0px)); z-index:50; display:none; justify-content:space-around;
     background:rgba(244,245,240,.88); backdrop-filter:saturate(180%) blur(22px); border-top:1px solid var(--line); padding-bottom:var(--bar-pad)}
   .tabbar button{flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 0 5px; color:var(--faint); font-size:10px; font-weight:600; transition:color .15s}
   .tabbar button .ti{font-size:20px; line-height:1; transition:transform .15s var(--ease)}
@@ -286,7 +286,7 @@
   .subsec{border:1px solid var(--line); border-radius:12px; padding:12px; margin-top:6px; background:var(--bg)}
   .subsec h4{margin:0 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted)}
 
-  #toast{position:fixed; bottom:calc(var(--bar-h) + var(--bar-pad) + 18px); left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff; padding:11px 18px; border-radius:12px; font-size:14px; font-weight:500; z-index:90; opacity:0; transition:all .25s; pointer-events:none; box-shadow:0 12px 40px rgba(0,0,0,.3)}
+  #toast{position:fixed; bottom:calc(var(--bar-h) + var(--bar-pad) + 18px - var(--vv-gap,0px)); left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff; padding:11px 18px; border-radius:12px; font-size:14px; font-weight:500; z-index:90; opacity:0; transition:all .25s; pointer-events:none; box-shadow:0 12px 40px rgba(0,0,0,.3)}
   #toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
   #toast .ok{color:var(--accent)}
 
@@ -322,7 +322,7 @@
     /* merged Today = fixed flex column: map pinned on top, list scrolls below */
     /* NOTE: --head-h is the MEASURED header height and already includes env(safe-area-inset-top)
        (header.top pads itself) — do NOT add the inset again here (it doubled the gap in the installed PWA) */
-    body[data-view="today"] .app{position:fixed; top:var(--head-h); bottom:calc(var(--bar-h) + var(--bar-pad)); left:0; right:0; display:flex; flex-direction:column; align-items:stretch; padding:0}
+    body[data-view="today"] .app{position:fixed; top:var(--head-h); bottom:calc(var(--bar-h) + var(--bar-pad) - var(--vv-gap,0px)); left:0; right:0; display:flex; flex-direction:column; align-items:stretch; padding:0}
     body[data-view="today"] .mapwrap{display:block; order:-1; flex:0 0 40%; min-height:0; overflow:hidden; position:relative; top:0; border:none; border-radius:0; box-shadow:none; transition:flex-basis .28s var(--ease)}
     body.map-collapsed[data-view="today"] .mapwrap{flex-basis:0; min-height:0; border:none}
     body[data-view="today"] #main{flex:1 1 0; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 0 16px; touch-action:pan-y}
@@ -588,7 +588,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r27";
+const APP_BUILD = "10 Jun 2026 · r28";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -924,6 +924,21 @@ function renderClocks(){ const now=new Date(); const home=state.meta.homeTz,dest
     `<div class="clock dest"><div class="lbl">🌴 ${esc(tzAbbr(dest))}</div><div class="t mono">${fmtTime(now,dest)}</div><div class="sub2">${esc(relOffset(dest,home))}</div></div>`;
 }
 function syncHeadH(){ const h=document.querySelector("header.top"); if(h) document.documentElement.style.setProperty("--head-h", Math.round(h.getBoundingClientRect().height)+"px"); }
+/* iOS 26 standalone bug: the layout viewport reserves phantom space for Safari's
+   (hidden) toolbar, so fixed bottom elements float above the real screen bottom.
+   Measure the true visible height and slide the chrome down by the difference.
+   Self-healing: when iOS fixes it (Safari 26.1), the gap measures 0. */
+function syncVVGap(){ try{
+  const vv=window.visualViewport; if(!vv) return;
+  const gap=Math.max(0, Math.round(vv.height + vv.offsetTop - innerHeight));
+  const de=document.documentElement;
+  de.style.setProperty("--vv-gap", gap+"px");
+  // bar slides into the real bottom zone → it needs home-indicator clearance again
+  if(gap>4) de.style.setProperty("--bar-pad","24px"); else de.style.removeProperty("--bar-pad");
+}catch(e){} }
+window.visualViewport?.addEventListener("resize", syncVVGap);
+window.visualViewport?.addEventListener("scroll", syncVVGap);
+setTimeout(syncVVGap, 400); setTimeout(syncVVGap, 1500);
 
 /* ---- view switching ---- */
 function moveTabInd(){
@@ -1529,7 +1544,7 @@ function renderSettings(){ const m=state.meta; const ownKey=!!(m.mapsKey||"").tr
       <div class="hint">A lock screen when the app opens, shared with Elisa. Soft (client-side) protection — keeps casual eyes out.</div></div>
     <div class="field"><label>Install</label><div class="hint">On iPhone: Safari → Share → <b>Add to Home Screen</b> to launch INDO 2026 full-screen like a real app.</div>
       <div class="hint" style="margin-top:6px">Build <span class="mono">${esc(APP_BUILD)}</span> — if a fix doesn't show, fully close and reopen the app.</div>
-      <div class="hint" style="margin-top:4px">Viewport <span class="mono">${innerWidth}×${innerHeight}</span> of <span class="mono">${screen.width}×${screen.height}</span> · insets <span class="mono">${(()=>{const d=document.createElement("div");d.style.cssText="position:fixed;left:-9999px;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)";document.body.appendChild(d);const c=getComputedStyle(d);const v="t"+(parseFloat(c.paddingTop)||0)+" b"+(parseFloat(c.paddingBottom)||0);d.remove();return v;})()}</span> · ${navigator.standalone?"standalone":"browser"}</div></div>
+      <div class="hint" style="margin-top:4px">Viewport <span class="mono">${innerWidth}×${innerHeight}</span> of <span class="mono">${screen.width}×${screen.height}</span> · vv <span class="mono">${window.visualViewport?Math.round(visualViewport.height):"?"}</span> · gap <span class="mono">${getComputedStyle(document.documentElement).getPropertyValue("--vv-gap")||"0px"}</span> · insets <span class="mono">${(()=>{const d=document.createElement("div");d.style.cssText="position:fixed;left:-9999px;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)";document.body.appendChild(d);const c=getComputedStyle(d);const v="t"+(parseFloat(c.paddingTop)||0)+" b"+(parseFloat(c.paddingBottom)||0);d.remove();return v;})()}</span> · ${navigator.standalone?"standalone":"browser"}</div></div>
   </div>`;
   setSyncStatus(syncStatus);
 }
@@ -1781,7 +1796,7 @@ $("#fab")?.addEventListener("click",openCreateMenu);
 function setMapCollapsed(c){ document.body.classList.toggle("map-collapsed", c); localStorage.setItem("indoTrip.mapCollapsed", c?"1":""); if(map) setTimeout(()=>{ try{ map.invalidateSize(); }catch(e){} },300); }
 $("#mapToggle").addEventListener("click",()=>setMapCollapsed(!document.body.classList.contains("map-collapsed")));
 $("#scrim").addEventListener("click",e=>{ if(e.target.id==="scrim") closeModal(); });
-let _rT; window.addEventListener("resize",()=>{ clearTimeout(_rT); _rT=setTimeout(()=>{ syncHeadH(); moveTabInd(); if(map){ map.invalidateSize(); if(!isMobile()||ui.view==="map") refreshMap(); } },140); });
+let _rT; window.addEventListener("resize",()=>{ clearTimeout(_rT); _rT=setTimeout(()=>{ syncHeadH(); syncVVGap(); moveTabInd(); if(map){ map.invalidateSize(); if(!isMobile()||ui.view==="map") refreshMap(); } },140); });
 matchMedia("(max-width:859px)").addEventListener?.("change",()=>{ if(!isMobile()&&ui.view==="map") setView("today"); else if(map) setTimeout(()=>{ map.invalidateSize(); refreshMap(); },90); });
 
 /* ---- PWA: static manifest.webmanifest + icon-512.png in the repo.
