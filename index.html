@@ -551,7 +551,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r11";
+const APP_BUILD = "10 Jun 2026 · r12";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -851,7 +851,7 @@ function tryUnlock(){ const v=($("#lockInput").value||"").trim(); if(hashCode(v)
 /* ---- google travel times ---- */
 function loadGoogle(){ const key=getMapsKey(); if(!key||googleReady||googleLoading) return; googleLoading=true;
   window.__gmapsReady=()=>{ googleReady=true; googleLoading=false; legCache.clear(); if(ui.view==="itinerary"||ui.view==="today") renderMain(); };
-  const s=document.createElement("script"); s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&callback=__gmapsReady&loading=async`; s.async=true;
+  const s=document.createElement("script"); s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&callback=__gmapsReady&loading=async`; s.async=true;
   s.onerror=()=>{ googleLoading=false; toast("Google Maps couldn’t load — check the key in Settings"); }; document.head.appendChild(s);
 }
 function gDirections(o,d,departAt){ return new Promise(res=>{ if(!googleReady){res(null);return;}
@@ -1236,9 +1236,10 @@ function hotspotCard(h){
   return `<div class="hs-card ${exp?'expanded':''}" data-hs="${h.id}">
     <div class="hs-head">${thumb}
       <div class="hs-info"><div class="hs-top"><span class="hs-name">${esc(h.name||t.label)}</span>${(geoState==="on"&&d!==Infinity)?`<span class="hs-dist">${distLabel(d)}</span>`:""}</div>
-      <div class="hs-cat">${t.emoji} ${t.label}${h.location?.name?` · ${esc(h.location.name)}`:""}</div></div></div>
+      <div class="hs-cat">${t.emoji} ${t.label}${h.rating?` · <span style="color:#b8860b">★ ${h.rating}</span>${h.ratingN?` <span style="color:var(--faint)">(${h.ratingN>=1000?(h.ratingN/1000).toFixed(1)+"k":h.ratingN})</span>`:""}`:""}${typeof h.price==="number"?` · <span style="color:var(--muted)">${"$".repeat(h.price+1)}</span>`:""}</div></div></div>
     <div class="hs-expand"${exp?' style="max-height:none"':''}>
       ${h.location&&(h.location.name||h.location.address)?`<div class="loc"><span class="pin">📍</span><span><span style="font-weight:500">${esc(h.location.name||"")}</span>${h.location.name&&h.location.address?"<br>":""}<span class="addr">${esc(h.location.address||"")}</span></span></div>`:""}
+      ${hoursHTML(h)}
       ${h.url?`<div class="hs-link"><a href="${esc(/^https?:/.test(h.url)?h.url:'https://'+h.url)}" target="_blank" rel="noopener">🔗 ${esc(h.url.replace(/^https?:\/\//,'').slice(0,40))}</a></div>`:""}
       ${h.notes?`<div class="note">${esc(h.notes)}</div>`:""}
       ${(h.photos&&h.photos.length>1)?`<div class="hs-gallery">${h.photos.slice(1).map(u=>`<a class="hs-thumb" href="${esc(u)}" target="_blank" rel="noopener" style="background-image:url('${esc(u)}')"></a>`).join("")}</div>`:""}
@@ -1250,6 +1251,8 @@ function hotspotCard(h){
       </div>
     </div></div>`;
 }
+function hoursHTML(h){ if(!h.hours||!h.hours.length) return ""; const today=(new Date().getDay()+6)%7; const line=(h.hours[today]||"").replace(/^\w+:\s*/,"");
+  return `<details class="help" style="margin-top:9px"><summary>🕑 Today: ${esc(line||"see hours")}</summary><div class="inner"><ul style="margin:4px 0;padding-left:17px;line-height:1.7">${h.hours.map((l,i)=>`<li${i===today?' style="font-weight:600"':''}>${esc(l)}</li>`).join("")}</ul></div></details>`; }
 function setHsExpanded(id,on){
   const el=document.querySelector('.hs-card[data-hs="'+cssEsc(id)+'"]'); if(!el) return;
   el.classList.toggle('expanded',on);
@@ -1423,7 +1426,39 @@ function locFieldHTML(prefix,label,loc){ loc=loc||{};
 }
 function renderLocBlock(){ const isLeg=TYPES[draft.type]?.legtoo;
   $("#locBlock").innerHTML=isLeg?(locFieldHTML("from","From",draft.fromLoc)+locFieldHTML("to","To",draft.toLoc)):locFieldHTML("main","Location",draft.location); }
-async function doGeocode(prefix){ const q=$("#"+prefix+"-q").value.trim(); if(!q) return;
+/* ---- Google Places import (hotspots) ---- */
+let _placesSvc=null;
+function placesSvc(){ if(!_placesSvc && window.google && google.maps && google.maps.places){ try{ _placesSvc=new google.maps.places.PlacesService(document.createElement("div")); }catch(e){} } return _placesSvc; }
+function placeNameFromUrl(u){ const m=u.match(/\/place\/([^\/@?]+)/); return m? decodeURIComponent(m[1].replace(/\+/g," ")).trim() : null; }
+function placesSearch(prefix){
+  const raw=$("#"+prefix+"-q").value.trim(); const q=placeNameFromUrl(raw)||raw;
+  const svc=placesSvc(); const res=$("#"+prefix+"-res");
+  res.innerHTML='<button disabled>Searching Google…</button>'; res.classList.add("show");
+  svc.textSearch({query:q},(arr,status)=>{
+    if(status!==google.maps.places.PlacesServiceStatus.OK || !arr || !arr.length){ res.classList.remove("show"); doGeocodeOSM(prefix); return; }
+    res.innerHTML=arr.slice(0,6).map((p,i)=>`<button type="button" data-pi="${i}">📍 <b>${esc(p.name)}</b>${p.rating?` <span style="color:#b8860b">★ ${p.rating}</span>`:""}<br><span style="color:var(--muted);font-size:12px">${esc(p.formatted_address||p.vicinity||"")}</span></button>`).join("");
+    res.querySelectorAll("button").forEach((b,i)=>b.addEventListener("click",()=>{ const p=arr[i]; const loc=p.geometry&&p.geometry.location;
+      setLoc(prefix,{name:p.name,address:p.formatted_address||p.vicinity||"",lat:loc?loc.lat():null,lng:loc?loc.lng():null}); res.classList.remove("show");
+      if(prefix==="hsloc"){ const nm=$("#h-name"); if(nm&&!nm.value.trim()) nm.value=p.name; if(p.place_id) enrichHotspotFromPlace(p.place_id); }
+    }));
+  });
+}
+function enrichHotspotFromPlace(placeId){
+  const svc=placesSvc(); if(!svc) return; const st=$("#hUpStatus"); if(st) st.textContent="Pulling photos & details from Google…";
+  svc.getDetails({placeId, fields:["name","rating","user_ratings_total","opening_hours","website","photos","price_level"]},(p,status)=>{
+    if(status!==google.maps.places.PlacesServiceStatus.OK || !p){ if(st) st.textContent="Couldn’t pull Google details — add photos manually if you like."; return; }
+    if(p.rating){ draft.rating=p.rating; draft.ratingN=p.user_ratings_total||0; }
+    if(typeof p.price_level==="number") draft.price=p.price_level;
+    if(p.website && !(draft.url||"").trim()){ draft.url=p.website; const u=$("#h-url"); if(u) u.value=p.website; }
+    if(p.opening_hours && p.opening_hours.weekday_text) draft.hours=p.opening_hours.weekday_text;
+    if(p.photos && p.photos.length){ draft.photos=draft.photos||[]; p.photos.slice(0,5).forEach(ph=>{ try{ draft.photos.push(ph.getUrl({maxWidth:1200,maxHeight:1200})); }catch(e){} }); }
+    const row=$("#hPhotos"); if(row) row.innerHTML=(draft.photos||[]).map((u,i)=>`<div class="hs-thumb" style="background-image:url('${esc(u)}')"><button class="hs-rm" data-act="rmPhoto" data-i="${i}">✕</button></div>`).join("");
+    if(st){ const bits=[]; if((draft.photos||[]).length) bits.push((draft.photos.length)+" photos"); if(draft.rating) bits.push("★ "+draft.rating); if(draft.hours) bits.push("hours"); st.textContent="Imported from Google ✓"+(bits.length?" — "+bits.join(", "):""); }
+  });
+}
+function doGeocodeOSM(prefix){ doGeocode(prefix, true); }
+async function doGeocode(prefix, skipPlaces){ const q=$("#"+prefix+"-q").value.trim(); if(!q) return;
+  if(!skipPlaces && prefix==="hsloc" && googleReady && placesSvc() && !parseLatLng(q)){ placesSearch(prefix); return; }
   const coords=parseLatLng(q);
   if(coords){ setLoc(prefix,{name:"Locating…",address:"",lat:coords.lat,lng:coords.lng});
     reverseGeocode(coords).then(info=>setLoc(prefix,{name:info.name||"Pinned location",address:info.address||"",lat:coords.lat,lng:coords.lng}));
