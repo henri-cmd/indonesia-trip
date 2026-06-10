@@ -388,23 +388,26 @@
   /* merged-Today map controls: compact floating buttons, no big legend bar */
   @media(max-width:859px){
     body[data-view="today"] .legend{display:none}
-    body[data-view="today"] .map-foot{position:absolute; top:auto; bottom:9px; right:9px; left:auto; width:auto; background:transparent; border:none; backdrop-filter:none; padding:0; gap:6px; flex-direction:column; align-items:flex-end}
-    body[data-view="today"] .map-foot .btn{margin:0; background:rgba(255,255,255,.93); backdrop-filter:blur(8px); box-shadow:0 2px 8px rgba(0,0,0,.2); border-color:transparent}
+    body[data-view="today"] .map-foot{position:absolute; top:auto; bottom:7px; left:9px; right:9px; width:auto; background:transparent; border:none; backdrop-filter:none; padding:0; gap:7px; flex-direction:row; flex-wrap:nowrap; align-items:center}
+    body[data-view="today"] .map-foot .btn{margin:0; flex:1 1 0; justify-content:center; padding:6px 6px; font-size:12px; border-radius:11px; background:rgba(255,255,255,.93); backdrop-filter:blur(8px); box-shadow:0 2px 8px rgba(0,0,0,.18); border-color:transparent; white-space:nowrap}
+    body[data-view="today"] .mapwrap .leaflet-bottom .leaflet-control{margin-bottom:38px}
   }
 
   /* collapsible date selector */
   .todayhead{position:sticky; top:0; z-index:6; background:var(--card)}
   .datebar{display:flex; align-items:center; gap:9px; padding:12px 16px 8px; background:var(--card)}
-  .datebar .segtoggle{flex:none; padding:2px}
-  .datebar .segtoggle button{padding:5px 12px; font-size:12px}
+  .datebar .segtoggle{flex:none}
   .datemain{display:flex; align-items:baseline; gap:7px; flex-wrap:nowrap; flex:1; min-width:0; overflow:hidden; text-align:left; padding:0}
   .datemain .dbig{font-size:18px; font-weight:700; letter-spacing:-.015em; white-space:nowrap}
   .datemain .dsub{color:var(--muted); font-size:11px; white-space:nowrap}
   .datemain .dtz{font-size:10px; color:var(--accent-deep); background:var(--accent-soft); padding:2px 7px; border-radius:20px; font-weight:600; white-space:nowrap}
   .datemain .chev{color:var(--faint); font-size:12px; transition:transform .22s var(--ease)}
   .datebar.open .chev{transform:rotate(180deg)}
-  .gotoday{width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:var(--card); color:var(--accent-deep); font-size:15px; display:flex; align-items:center; justify-content:center; flex:none}
-  .gotoday:hover{background:var(--bg)} .gotoday:active{transform:scale(.92)}
+  .gotoday{display:none; align-items:center; gap:4px; flex:none; padding:6px 12px; border-radius:20px; background:var(--accent-soft); color:var(--accent-deep); font-size:12px; font-weight:700; white-space:nowrap}
+  .datebar.offday .gotoday{display:inline-flex; animation:gtpop .22s var(--ease)}
+  .datebar.offday .dsub{display:none}
+  .gotoday:active{transform:scale(.93)}
+  @keyframes gtpop{from{opacity:0; transform:scale(.82)} to{opacity:1}}
   .daystrip{max-height:98px; overflow:hidden; transition:max-height .28s var(--ease), opacity .2s, padding .28s; border-bottom:1px solid var(--line)}
   .daystrip.collapsed{max-height:0 !important; padding-top:0 !important; padding-bottom:0 !important; opacity:0; border-bottom:none}
 
@@ -447,7 +450,7 @@
   .hs-rm{position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--ink); color:#fff; font-size:11px; display:flex; align-items:center; justify-content:center}
 
   /* "from you" nav estimate — floats at the bottom of the map */
-  .fromme{position:absolute; left:9px; bottom:9px; z-index:5; display:none; align-items:center; gap:7px; max-width:calc(100% - 128px);
+  .fromme{position:absolute; left:9px; bottom:48px; z-index:5; display:none; align-items:center; gap:7px; max-width:calc(100% - 18px);
     background:rgba(255,255,255,.94); backdrop-filter:blur(8px); border-radius:12px; padding:7px 11px; font-size:12.5px; box-shadow:0 2px 10px rgba(0,0,0,.18); flex-wrap:wrap}
   .fromme .fl{font-weight:700; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .fromme a{font-weight:600; white-space:nowrap}
@@ -474,8 +477,8 @@
   /* Day / All segmented toggle (Itinerary tab) */
   .itinbar{display:flex; justify-content:flex-end; padding:9px 16px 4px}
   .sec-head.itinhead{align-items:center}
-  .segtoggle{display:inline-flex; background:var(--bg); border:1px solid var(--line); border-radius:11px; padding:3px; gap:2px}
-  .segtoggle button{padding:6px 17px; border-radius:8px; font-size:13px; font-weight:600; color:var(--muted); transition:color .15s, background .15s, box-shadow .15s}
+  .segtoggle{display:inline-flex; background:var(--bg); border:1px solid var(--line); border-radius:11px; padding:2px; gap:2px}
+  .segtoggle button{padding:5px 13px; border-radius:8px; font-size:12.5px; font-weight:600; color:var(--muted); transition:color .15s, background .15s, box-shadow .15s}
   .segtoggle button.on{background:var(--card); color:var(--ink); box-shadow:0 1px 4px rgba(0,0,0,.12)}
 </style>
 </head>
@@ -559,7 +562,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r18";
+const APP_BUILD = "10 Jun 2026 · r19";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -974,7 +977,7 @@ function renderToday(){
           <span class="dsub" id="dbSub">Day ${ui.dayIdx+1}/${days.length}</span>
           <span class="dtz" id="dbTz">${esc(tzAbbr(cur.tz))}</span>
         </button>
-        <button class="gotoday" data-act="goToday" title="Go to current day">⊙</button>
+        <button class="gotoday" data-act="goToday" title="Go to current day">⊙ Today</button>
         ${itinToggleHTML()}
       </div>
       <div class="daystrip collapsed" id="daystrip">${pills}</div>
@@ -1049,7 +1052,8 @@ function tlLeg(lg){
       · <a href="${lg.gmapDir}" target="_blank" rel="noopener">route ↗</a></div></div>`,
     __leg:true, lg};
 }
-function updateDateBar(days,i){ const d=days[i]; if(!d) return; const D=$("#dbDate"),S=$("#dbSub"),T=$("#dbTz"); if(D)D.textContent=fmtDateShort(d.instant,d.tz); if(S)S.textContent="Day "+(i+1)+"/"+days.length; if(T)T.textContent=tzAbbr(d.tz); }
+function updateDateBar(days,i){ const d=days[i]; if(!d) return; const D=$("#dbDate"),S=$("#dbSub"),T=$("#dbTz"); if(D)D.textContent=fmtDateShort(d.instant,d.tz); if(S)S.textContent="Day "+(i+1)+"/"+days.length; if(T)T.textContent=tzAbbr(d.tz);
+  const db=$("#datebar"); if(db){ const tk=dayKey(new Date(),state.meta.destTz); db.classList.toggle("offday", days.some(x=>x.key===tk) && d.key!==tk); } }
 function setupPager(days){
   const pager=$("#pager"), track=$("#pagerTrack"), strip=$("#daystrip"); if(!pager||!track) return;
   const w=()=>pager.clientWidth||1;
