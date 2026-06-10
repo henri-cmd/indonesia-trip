@@ -22,7 +22,9 @@
     --accent:#c4f53d; --accent-deep:#5f8b06; --accent-soft:#eef9c9;
     --blue:#2f6fed; --violet:#7c5cf0; --amber:#e08a00; --green:#11936a; --red:#e0483d; --teal:#0e9aa0; --grey:#7b8071;
     --shadow:0 1px 2px rgba(20,22,15,.04), 0 6px 20px rgba(20,22,15,.05);
-    --radius:15px; --head-h:64px; --bar-h:60px;
+    --radius:15px; --head-h:64px; --bar-h:56px;
+    /* bottom inset for the tab bar: hug the home indicator (shave 8px, never below 6px) */
+    --bar-pad:max(calc(env(safe-area-inset-bottom) - 8px), 6px);
     --ease:cubic-bezier(.22,.7,.2,1);
   }
   *{box-sizing:border-box}
@@ -86,8 +88,8 @@
 
   /* ---------- Bottom tab bar (mobile only) ---------- */
   .tabbar{position:fixed; left:0; right:0; bottom:0; z-index:50; display:none; justify-content:space-around;
-    background:rgba(255,255,255,.84); backdrop-filter:saturate(180%) blur(22px); border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom)}
-  .tabbar button{flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 0 7px; color:var(--faint); font-size:10px; font-weight:600; transition:color .15s}
+    background:rgba(255,255,255,.84); backdrop-filter:saturate(180%) blur(22px); border-top:1px solid var(--line); padding-bottom:var(--bar-pad)}
+  .tabbar button{flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 0 5px; color:var(--faint); font-size:10px; font-weight:600; transition:color .15s}
   .tabbar button .ti{font-size:20px; line-height:1; transition:transform .15s var(--ease)}
   .tabbar button .ti{padding:3px 16px; border-radius:20px; transition:background .15s, transform .15s var(--ease)}
   .tabbar button{position:relative; z-index:1}
@@ -282,7 +284,7 @@
   .subsec{border:1px solid var(--line); border-radius:12px; padding:12px; margin-top:6px; background:var(--bg)}
   .subsec h4{margin:0 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted)}
 
-  #toast{position:fixed; bottom:calc(var(--bar-h) + env(safe-area-inset-bottom) + 18px); left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff; padding:11px 18px; border-radius:12px; font-size:14px; font-weight:500; z-index:90; opacity:0; transition:all .25s; pointer-events:none; box-shadow:0 12px 40px rgba(0,0,0,.3)}
+  #toast{position:fixed; bottom:calc(var(--bar-h) + var(--bar-pad) + 18px); left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff; padding:11px 18px; border-radius:12px; font-size:14px; font-weight:500; z-index:90; opacity:0; transition:all .25s; pointer-events:none; box-shadow:0 12px 40px rgba(0,0,0,.3)}
   #toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
   #toast .ok{color:var(--accent)}
 
@@ -313,10 +315,12 @@
     .clock .lbl{font-size:9px}
     .clock .sub2{display:none}
     .app{grid-template-columns:1fr; display:block; padding:0; gap:0; max-width:none}
-    #main{border:none; border-radius:0; box-shadow:none; min-height:70vh; padding-bottom:calc(var(--bar-h) + env(safe-area-inset-bottom) + 14px)}
+    #main{border:none; border-radius:0; box-shadow:none; min-height:70vh; padding-bottom:calc(var(--bar-h) + var(--bar-pad) + 14px)}
     .mapwrap{display:none}
     /* merged Today = fixed flex column: map pinned on top, list scrolls below */
-    body[data-view="today"] .app{position:fixed; top:calc(var(--head-h) + env(safe-area-inset-top)); bottom:calc(var(--bar-h) + env(safe-area-inset-bottom)); left:0; right:0; display:flex; flex-direction:column; align-items:stretch; padding:0}
+    /* NOTE: --head-h is the MEASURED header height and already includes env(safe-area-inset-top)
+       (header.top pads itself) — do NOT add the inset again here (it doubled the gap in the installed PWA) */
+    body[data-view="today"] .app{position:fixed; top:var(--head-h); bottom:calc(var(--bar-h) + var(--bar-pad)); left:0; right:0; display:flex; flex-direction:column; align-items:stretch; padding:0}
     body[data-view="today"] .mapwrap{display:block; order:-1; flex:0 0 40%; min-height:0; overflow:hidden; position:relative; top:0; border:none; border-radius:0; box-shadow:none; transition:flex-basis .28s var(--ease)}
     body.map-collapsed[data-view="today"] .mapwrap{flex-basis:0; min-height:0; border:none}
     body[data-view="today"] #main{flex:1 1 0; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 0 16px; touch-action:pan-y}
@@ -580,7 +584,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r24";
+const APP_BUILD = "10 Jun 2026 · r25";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
