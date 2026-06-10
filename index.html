@@ -319,6 +319,7 @@
     body[data-view="today"] .mapwrap{display:block; order:-1; flex:0 0 40%; position:relative; top:0; border:none; border-radius:0; box-shadow:none; transition:flex-basis .28s var(--ease)}
     body.map-collapsed[data-view="today"] .mapwrap{flex-basis:0; min-height:0; border:none}
     body[data-view="today"] #main{flex:1 1 0; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 0 16px; touch-action:pan-y}
+    body[data-view="today"] .pager{min-height:100%}
     #map{height:100%; min-height:0; border-radius:0}
     .map-foot{position:absolute; bottom:0; left:0; right:0; background:rgba(255,255,255,.9); backdrop-filter:blur(10px); z-index:2; border-top:1px solid var(--line)}
     .tabbar{display:flex}
@@ -1015,21 +1016,20 @@ function setupPager(days){
   pagerCtl={setTo, days};
   place(ui.dayIdx,false); sync(ui.dayIdx);
   if(state.meta.mapsKey && !googleReady) loadGoogle();
-  // finger-following horizontal swipe to change days — attached ONCE to the whole itinerary section
-  // (so it works on empty space + the date bar, not just on a card); vertical drags still scroll.
-  const mainEl=$("#main");
-  if(mainEl && !mainEl._daySwipe){ mainEl._daySwipe=true;
-    let sx=0,sy=0,dir=null,onS=false;
-    mainEl.addEventListener("touchstart",e=>{ if(ui.view!=="today"||!pagerCtl||e.touches.length!==1||e.target.closest(".daystrip,input,select,textarea,button,a,label")){onS=false;return;} sx=e.touches[0].clientX; sy=e.touches[0].clientY; dir=null; onS=true; },{passive:true});
-    mainEl.addEventListener("touchmove",e=>{ if(!onS)return; const tr=$("#pagerTrack"); if(!tr){onS=false;return;} const dx=e.touches[0].clientX-sx, dy=e.touches[0].clientY-sy;
-      if(dir===null && (Math.abs(dx)>10||Math.abs(dy)>10)) dir = Math.abs(dx)>Math.abs(dy)*1.25 ? "x":"y";
-      if(dir==="x"){ const n=(pagerCtl.days||[]).length; let d=dx; if((ui.dayIdx===0&&d>0)||(ui.dayIdx===n-1&&d<0)) d*=0.3; tr.style.transition="none"; tr.style.transform="translateX(calc("+(-ui.dayIdx*100)+"% + "+d+"px))"; }
-    },{passive:true});
-    mainEl.addEventListener("touchend",e=>{ if(!onS)return; onS=false; if(dir!=="x")return; const pw=($("#pager")?.clientWidth)||1, n=(pagerCtl.days||[]).length, dx=e.changedTouches[0].clientX-sx;
-      if(dx<-pw*0.18 && ui.dayIdx<n-1) pagerCtl.setTo(ui.dayIdx+1,true);
-      else if(dx>pw*0.18 && ui.dayIdx>0) pagerCtl.setTo(ui.dayIdx-1,true);
-      else pagerCtl.setTo(ui.dayIdx,true); },{passive:true});
-  }
+  // Gestures attached to the PAGER (a Today-only element, recreated each render) — NOT #main —
+  // so other views' inputs (e.g. Settings dropdowns) are never affected by these listeners.
+  // Horizontal = finger-following day change; pull-down at the top = bring the map back.
+  let sx=0,sy=0,dir=null,onG=false;
+  pager.addEventListener("touchstart",e=>{ if(e.touches.length!==1||e.target.closest(".daystrip,input,select,textarea,button,a,label")){onG=false;return;} sx=e.touches[0].clientX; sy=e.touches[0].clientY; dir=null; onG=true; },{passive:true});
+  pager.addEventListener("touchmove",e=>{ if(!onG)return; const dx=e.touches[0].clientX-sx, dy=e.touches[0].clientY-sy;
+    if(dir===null && (Math.abs(dx)>10||Math.abs(dy)>10)) dir = Math.abs(dx)>Math.abs(dy)*1.25 ? "x":"y";
+    if(dir==="x"){ const n=days.length; let d=dx; if((ui.dayIdx===0&&d>0)||(ui.dayIdx===n-1&&d<0)) d*=0.3; track.style.transition="none"; track.style.transform="translateX(calc("+(-ui.dayIdx*100)+"% + "+d+"px))"; }
+    else if(dir==="y" && dy>70 && (($("#main")?.scrollTop||0)<=0) && document.body.classList.contains("map-collapsed")){ onG=false; setMapCollapsed(false); }
+  },{passive:true});
+  pager.addEventListener("touchend",e=>{ if(!onG)return; onG=false; if(dir!=="x")return; const dx=e.changedTouches[0].clientX-sx;
+    if(dx<-w()*0.18 && ui.dayIdx<days.length-1) setTo(ui.dayIdx+1,true);
+    else if(dx>w()*0.18 && ui.dayIdx>0) setTo(ui.dayIdx-1,true);
+    else setTo(ui.dayIdx,true); },{passive:true});
   strip&&strip.querySelectorAll(".daypill").forEach(p=>p.addEventListener("click",()=>{ setTo(+p.dataset.day,true); strip.classList.add("collapsed"); $("#datebar")?.classList.remove("open"); }));
   if(map) setTimeout(()=>{ try{ map.invalidateSize(); }catch(e){} },60);
 }
@@ -1451,13 +1451,6 @@ $("#meBtn")?.addEventListener("click",recenterMe);
 $("#fab")?.addEventListener("click",openCreateMenu);
 function setMapCollapsed(c){ document.body.classList.toggle("map-collapsed", c); localStorage.setItem("indoTrip.mapCollapsed", c?"1":""); if(map) setTimeout(()=>{ try{ map.invalidateSize(); }catch(e){} },300); }
 $("#mapToggle").addEventListener("click",()=>setMapCollapsed(!document.body.classList.contains("map-collapsed")));
-/* gesture: pull down at the very top of the list to bring the map back (collapse via the 🗺 button) */
-(function(){
-  const main=$("#main"); if(!main) return;
-  let psy=0,pull=false;
-  main.addEventListener("touchstart",e=>{ if(e.touches.length!==1)return; psy=e.touches[0].clientY; pull = main.scrollTop<=0 && isMobile() && ui.view==="today" && document.body.classList.contains("map-collapsed"); },{passive:true});
-  main.addEventListener("touchmove",e=>{ if(!pull)return; if(e.touches[0].clientY-psy>70){ pull=false; setMapCollapsed(false); } },{passive:true});
-})();
 $("#scrim").addEventListener("click",e=>{ if(e.target.id==="scrim") closeModal(); });
 let _rT; window.addEventListener("resize",()=>{ clearTimeout(_rT); _rT=setTimeout(()=>{ syncHeadH(); moveTabInd(); if(map){ map.invalidateSize(); if(!isMobile()||ui.view==="map") refreshMap(); } },140); });
 matchMedia("(max-width:859px)").addEventListener?.("change",()=>{ if(!isMobile()&&ui.view==="map") setView("today"); else if(map) setTimeout(()=>{ map.invalidateSize(); refreshMap(); },90); });
