@@ -1,0 +1,14 @@
+{
+  "name": "INDO 2026",
+  "short_name": "INDO 2026",
+  "description": "Henri & Elisa's Indonesia trip planner",
+  "display": "standalone",
+  "start_url": "./",
+  "scope": "./",
+  "background_color": "#14160f",
+  "theme_color": "#14160f",
+  "icons": [
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

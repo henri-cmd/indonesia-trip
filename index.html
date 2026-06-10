@@ -8,6 +8,8 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="INDO 2026" />
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-512.png">
 <title>INDO 2026</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -584,7 +586,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r25";
+const APP_BUILD = "10 Jun 2026 · r26";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1781,21 +1783,10 @@ $("#scrim").addEventListener("click",e=>{ if(e.target.id==="scrim") closeModal()
 let _rT; window.addEventListener("resize",()=>{ clearTimeout(_rT); _rT=setTimeout(()=>{ syncHeadH(); moveTabInd(); if(map){ map.invalidateSize(); if(!isMobile()||ui.view==="map") refreshMap(); } },140); });
 matchMedia("(max-width:859px)").addEventListener?.("change",()=>{ if(!isMobile()&&ui.view==="map") setView("today"); else if(map) setTimeout(()=>{ map.invalidateSize(); refreshMap(); },90); });
 
-/* ---- PWA: runtime icon + manifest ---- */
-function roundRect(x,X,Y,w,h,r){ x.beginPath(); x.moveTo(X+r,Y); x.arcTo(X+w,Y,X+w,Y+h,r); x.arcTo(X+w,Y+h,X,Y+h,r); x.arcTo(X,Y+h,X,Y,r); x.arcTo(X,Y,X+w,Y,r); x.closePath(); }
-function makeIcon(size){ const c=document.createElement("canvas"); c.width=c.height=size; const x=c.getContext("2d");
-  x.fillStyle="#14160f"; roundRect(x,0,0,size,size,size*0.22); x.fill();
-  const cx=size/2,cy=size*0.45,r=size*0.19; const g=x.createRadialGradient(cx,cy-r*0.3,r*0.2,cx,cy,r); g.addColorStop(0,"#eaff86"); g.addColorStop(1,"#c4f53d");
-  x.fillStyle=g; x.beginPath(); x.arc(cx,cy,r,0,7); x.fill();
-  x.strokeStyle="rgba(196,245,61,.45)"; x.lineWidth=size*0.014; x.beginPath(); x.moveTo(size*0.22,size*0.64); x.lineTo(size*0.78,size*0.64); x.stroke();
-  x.fillStyle="#fff"; x.textAlign="center"; x.textBaseline="middle"; x.font=`700 ${size*0.115}px 'DM Sans',system-ui,sans-serif`; x.fillText("INDO 2026",cx,size*0.82);
-  return c.toDataURL("image/png"); }
-function setupPWA(){ try{ const icon=makeIcon(512);
-  let ati=document.querySelector('link[rel="apple-touch-icon"]'); if(!ati){ati=document.createElement("link");ati.rel="apple-touch-icon";document.head.appendChild(ati);} ati.href=icon;
-  const manifest={name:"INDO 2026",short_name:"INDO 2026",display:"standalone",background_color:"#14160f",theme_color:"#14160f",start_url:".",icons:[{src:icon,sizes:"512x512",type:"image/png",purpose:"any maskable"}]};
-  const url=URL.createObjectURL(new Blob([JSON.stringify(manifest)],{type:"application/manifest+json"}));
-  let ml=document.querySelector('link[rel="manifest"]'); if(!ml){ml=document.createElement("link");ml.rel="manifest";document.head.appendChild(ml);} ml.href=url;
-}catch(e){} }
+/* ---- PWA: static manifest.webmanifest + icon-512.png in the repo.
+   (Was a runtime blob manifest — iOS snapshots the manifest at Add-to-Home-Screen
+   and blob URLs don't survive that, leaving a letterboxed/half-configured shell.
+   Keep these as real files; icon-512.png was generated from the old makeIcon().) */
 
 /* ---- splash ---- */
 function buildSplash(){ $("#splashWm").innerHTML=[..."INDO 2026"].map((ch,i)=>`<span style="animation-delay:${0.15+i*0.05}s">${ch===" "?"&nbsp;":ch}</span>`).join(""); }
@@ -1814,7 +1805,7 @@ $("#lockInput").addEventListener("keydown",e=>{ if(e.key==="Enter") tryUnlock();
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if($("#detail").classList.contains("show")) closeDetail(); else if($("#scrim").classList.contains("show")) closeModal(); } });
 setInterval(renderClocks,1000*20);
 setInterval(()=>{ if(ui.view==="today"){ const days=tripDays(); if(days[ui.dayIdx]?.key===dayKey(new Date(),state.meta.destTz)) renderToday(); } },60000);
-document.fonts?.ready.then(()=>{ setupPWA(); syncHeadH(); }); setupPWA();
+document.fonts?.ready.then(()=>{ syncHeadH(); });
 $("#splash").addEventListener("click",hideSplash);
 const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
 setTimeout(hideSplash, reduce?300:1400);
