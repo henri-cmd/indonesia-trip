@@ -468,9 +468,17 @@
   .create-opt{display:flex; align-items:center; gap:14px; padding:16px; border:1px solid var(--line); border-radius:14px; background:var(--card); font-weight:600; font-size:15px; text-align:left}
   .create-opt:hover{border-color:var(--ink); background:var(--bg)}
   .create-opt .e{font-size:24px}
+
+  /* Day / All segmented toggle (Itinerary tab) */
+  .itinbar{display:flex; padding:9px 16px 4px}
+  .sec-head.itinhead{align-items:center}
+  .segtoggle{display:inline-flex; background:var(--bg); border:1px solid var(--line); border-radius:11px; padding:3px; gap:2px}
+  .segtoggle button{padding:6px 17px; border-radius:8px; font-size:13px; font-weight:600; color:var(--muted); transition:color .15s, background .15s, box-shadow .15s}
+  .segtoggle button.on{background:var(--card); color:var(--ink); box-shadow:0 1px 4px rgba(0,0,0,.12)}
+  @media(max-width:859px){ body[data-view="today"][data-itin="all"] .mapwrap{display:none} }
 </style>
 </head>
-<body data-view="today">
+<body data-view="today" data-itin="day">
 
 <div id="splash">
   <div class="sun"></div>
@@ -489,8 +497,7 @@
     </div>
     <div class="clocks" id="clocks"></div>
     <nav class="tabs desktop-only" id="topnav">
-      <button data-view="today" class="active">Today</button>
-      <button data-view="itinerary">Plan</button>
+      <button data-view="today" class="active">Itinerary</button>
       <button data-view="hotspots">Hotspots</button>
       <button data-view="documents">Docs</button>
     </nav>
@@ -515,10 +522,9 @@
 
 <nav class="tabbar" id="tabbar">
   <span class="tab-ind" id="tabInd"></span>
-  <button data-view="today" class="active"><span class="ti">📅</span><span>Today</span></button>
-  <button data-view="itinerary"><span class="ti">🗒️</span><span>Plan</span></button>
-  <button class="fab" id="fab" aria-label="Create">＋</button>
+  <button data-view="today" class="active"><span class="ti">🗓️</span><span>Itinerary</span></button>
   <button data-view="hotspots"><span class="ti">📍</span><span>Hotspots</span></button>
+  <button class="fab" id="fab" aria-label="Create">＋</button>
   <button data-view="documents"><span class="ti">📁</span><span>Docs</span></button>
 </nav>
 
@@ -551,7 +557,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r12";
+const APP_BUILD = "10 Jun 2026 · r13";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -581,7 +587,7 @@ const TYPE_HEX = {flight:"#2f6fed",hotel:"#7c5cf0",transfer:"#e08a00",activity:"
 const TZ_ABBR = {"Asia/Makassar":"WITA","Asia/Jakarta":"WIB","Asia/Jayapura":"WIT","Asia/Singapore":"SGT","Asia/Dubai":"GST","Australia/Sydney":"AEST"};
 
 let state = load();
-let ui = { view:"today", selId:null, dayIdx:null, expandedId:null };
+let ui = { view:"today", selId:null, dayIdx:null, expandedId:null, itinMode:(localStorage.getItem("indoTrip.itinMode")==="all"?"all":"day") };
 const legCache = new Map();
 let googleReady=false, googleLoading=false;
 let focusDayKey=null;
@@ -752,8 +758,7 @@ function focusItem(id){
   const it = state.items.find(x=>x.id===id) || (state.hotspots||[]).find(x=>x.id===id);
   ui.selId=id;
   if(isMobile() && ui.view!=="today"){ setView("today"); }
-  if(ui.view==="itinerary") renderMain();
-  if(!it || document.body.classList.contains("map-collapsed")) return; // map hidden — nothing to pan
+  if(!it || document.body.classList.contains("map-collapsed") || (isMobile() && ui.itinMode==="all")) return; // map hidden — nothing to pan
   const run=()=>{
     if(!map) return;
     const pts=locsOf(it); if(!pts.length) return;
@@ -900,10 +905,10 @@ function moveTabInd(){
   ind.style.opacity=1;
 }
 function setView(v){
-  ui.view=v; document.body.dataset.view=v;
+  ui.view=v; document.body.dataset.view=v; document.body.dataset.itin=ui.itinMode;
   document.querySelectorAll("button[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
   hideFromMe();
-  if(v==="itinerary"||v==="documents"||v==="settings"||v==="hotspots") applyMapFocus(null);
+  if(v==="documents"||v==="settings"||v==="hotspots"||(v==="today"&&ui.itinMode==="all")) applyMapFocus(null);
   if(v==="hotspots" && geoState==="off") startGeo();
   renderMain();
   const mc=$("#main"); if(mc){ mc.style.animation="none"; void mc.offsetWidth; mc.style.animation="viewfade .24s var(--ease)"; }
@@ -911,8 +916,7 @@ function setView(v){
   if(map) setTimeout(()=>{ syncHeadH(); map.invalidateSize(); if(v==="today"||!isMobile()) refreshMap(); },70);
 }
 function renderMain(){
-  if(ui.view==="today") renderToday();
-  else if(ui.view==="itinerary") renderItinerary();
+  if(ui.view==="today"){ if(ui.itinMode==="all") renderItinerary(); else renderToday(); }
   else if(ui.view==="hotspots") renderHotspots();
   else if(ui.view==="documents") renderDocuments();
   else if(ui.view==="settings") renderSettings();
@@ -935,6 +939,15 @@ function currentDayIndex(days){
   if(todayKey>days[days.length-1].key) return days.length-1;
   i=days.findIndex(d=>d.key>=todayKey); return i<0?0:i;
 }
+function itinToggleHTML(){ return `<div class="segtoggle"><button class="${ui.itinMode!=="all"?"on":""}" data-act="itinDay">Day</button><button class="${ui.itinMode==="all"?"on":""}" data-act="itinAll">All</button></div>`; }
+function setItinMode(m){ if(m===ui.itinMode) return; ui.itinMode=m; localStorage.setItem("indoTrip.itinMode",m); document.body.dataset.itin=m;
+  if(m==="all") ui.expandedId=null;
+  renderMain();
+  if(m==="all") applyMapFocus(null);
+  const mc=$("#main"); if(mc){ mc.style.animation="none"; void mc.offsetWidth; mc.style.animation="viewfade .26s var(--ease)"; }
+  syncHeadH();
+  if(map) setTimeout(()=>{ try{ syncHeadH(); map.invalidateSize(); }catch(e){} },80);
+}
 function renderToday(){
   const days=tripDays();
   if(!days.length){
@@ -951,6 +964,7 @@ function renderToday(){
   const pages=days.map((d,i)=>dayPage(d,i,days.length,todayKey)).join("");
   $("#main").innerHTML=`
     <div class="todayhead">
+      <div class="itinbar">${itinToggleHTML()}</div>
       <div class="datebar" id="datebar">
         <button class="datemain" data-act="togglePills">
           <span class="dbig" id="dbDate">${esc(fmtDateFull(cur.instant,cur.tz))}</span>
@@ -1118,7 +1132,7 @@ function legHTML(a,b){ const lg=legInfo(a,b); if(!lg) return "";
 }
 function renderItinerary(){
   const items=sortedItems();
-  let html=`<div class="sec-head"><h2>Plan</h2><div class="sp"></div>
+  let html=`<div class="sec-head itinhead">${itinToggleHTML()}<div class="sp"></div>
     ${items.length?`<button class="btn ghost sm" data-act="addExample">＋ Example</button>`:""}
     <button class="btn lime" data-act="add">＋ Add item</button></div><div class="it-body">`;
   if(!items.length){
@@ -1522,6 +1536,8 @@ document.addEventListener("click",e=>{
   const g=e.target.closest("[data-geo]"); if(g){ doGeocode(g.dataset.geo); return; }
   if(!a) return; const act=a.dataset.act,id=a.dataset.id;
   switch(act){
+    case "itinDay": setItinMode("day"); break;
+    case "itinAll": setItinMode("all"); break;
     case "add": itemModal(null); break;
     case "addHotspot": hotspotModal(null); break;
     case "editHotspot": hotspotModal((state.hotspots||[]).find(x=>x.id===id)); break;
@@ -1602,7 +1618,7 @@ function buildSplash(){ $("#splashWm").innerHTML=[..."INDO 2026"].map((ch,i)=>`<
 function hideSplash(){ const s=$("#splash"); if(s){ s.classList.add("done"); setTimeout(()=>s&&s.remove&&s.remove(),600); } }
 
 /* ---- boot ---- */
-function afterLoad(){ if(state.meta.sub) $("#tripSub").value=state.meta.sub; renderClocks(); renderMain(); refreshMap(); loadGoogle(); syncHeadH(); setTimeout(moveTabInd,80); }
+function afterLoad(){ document.body.dataset.itin=ui.itinMode; if(state.meta.sub) $("#tripSub").value=state.meta.sub; renderClocks(); renderMain(); refreshMap(); loadGoogle(); syncHeadH(); setTimeout(moveTabInd,80); }
 buildSplash();
 if(localStorage.getItem("indoTrip.mapCollapsed")) document.body.classList.add("map-collapsed");
 initMap();
