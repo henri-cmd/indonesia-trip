@@ -412,6 +412,8 @@
   .gotoday{display:none; align-items:center; gap:4px; flex:none; padding:6px 12px; border-radius:20px; background:var(--accent-soft); color:var(--accent-deep); font-size:12px; font-weight:700; white-space:nowrap}
   .datebar.offday .gotoday{display:inline-flex; animation:gtpop .22s var(--ease)}
   .datebar.offday .datemain .dtz{display:none}
+  .wx{flex:none; font-size:10.5px; font-weight:600; color:#3a5bd9; background:#edf2ff; padding:2px 8px; border-radius:20px; white-space:nowrap}
+  .datebar.offday .datemain .wx{display:none !important}
   .gotoday:active{transform:scale(.93)}
   @keyframes gtpop{from{opacity:0; transform:scale(.82)} to{opacity:1}}
   .daystrip{max-height:98px; overflow:hidden; transition:max-height .28s var(--ease), opacity .2s, padding .28s; border-bottom:1px solid var(--line)}
@@ -568,7 +570,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r21";
+const APP_BUILD = "10 Jun 2026 · r22";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -981,6 +983,7 @@ function renderToday(){
           <span class="dbig" id="dbDate">${esc(fmtDateShort(cur.instant,cur.tz))}</span>
           <span class="chev">▾</span>
           <span class="dtz" id="dbSub">Day ${ui.dayIdx+1}/${days.length}</span>
+          <span class="wx" id="dbWx" style="display:none"></span>
         </button>
         <button class="gotoday" data-act="goToday" title="Go to current day">⊙ Today</button>
         ${itinToggleHTML()}
@@ -1058,6 +1061,7 @@ function tlLeg(lg){
     __leg:true, lg};
 }
 function updateDateBar(days,i){ const d=days[i]; if(!d) return; const D=$("#dbDate"),S=$("#dbSub"); if(D)D.textContent=fmtDateShort(d.instant,d.tz); if(S)S.textContent="Day "+(i+1)+"/"+days.length;
+  const W=$("#dbWx"); if(W){ if(!d._wxloc) assignWxLocs(days); const t=wxChip(d); W.textContent=t; W.style.display=t?"":"none"; }
   const db=$("#datebar"); if(db){ const tk=dayKey(new Date(),state.meta.destTz); db.classList.toggle("offday", days.some(x=>x.key===tk) && d.key!==tk); } }
 function setupPager(days){
   const pager=$("#pager"), track=$("#pagerTrack"), strip=$("#daystrip"); if(!pager||!track) return;
@@ -1070,6 +1074,7 @@ function setupPager(days){
   const setTo=(i,anim)=>{ i=Math.max(0,Math.min(days.length-1,i)); ui.dayIdx=i; place(i, anim!==false); sync(i); };
   pagerCtl={setTo, days};
   place(ui.dayIdx,false); sync(ui.dayIdx);
+  refreshWeather(days);
   if(getMapsKey() && !googleReady) loadGoogle();
   // Gestures attached to the PAGER (a Today-only element, recreated each render) — NOT #main —
   // so other views' inputs (e.g. Settings dropdowns) are never affected by these listeners.
@@ -1147,11 +1152,12 @@ function renderItinerary(){
     html+=countdownHTML(days);
     days.forEach(d=>{
       const isToday=d.key===todayKey;
-      html+=`<div class="daybar${isToday?" istoday":""}"><span class="d">${esc(fmtDateFull(d.instant,d.tz))}</span><span class="ln"></span><span class="dtz">${esc(tzAbbr(d.tz))}</span></div>`;
+      html+=`<div class="daybar${isToday?" istoday":""}"><span class="d">${esc(fmtDateFull(d.instant,d.tz))}</span><span class="ln"></span><span class="wx" data-wxdate="${d.key}" style="display:none"></span><span class="dtz">${esc(tzAbbr(d.tz))}</span></div>`;
       html+=dayTimelineHTML(d,todayKey);
     });
   }
   $("#main").innerHTML=html+`</div>`;
+  assignWxLocs(days); updateWxUI(days); refreshWeather(days);
 }
 
 /* ====================== DOCUMENTS ====================== */
@@ -1350,6 +1356,83 @@ function renderHotspotMarkers(){
 }
 function hsFocus(id){ const h=(state.hotspots||[]).find(x=>x.id===id); if(!h||!h.location||h.location.lat==null||!map) return; map.flyTo([h.location.lat,h.location.lng],Math.max(map.getZoom(),15),{duration:.5}); const m=markersById[id]; if(m) setTimeout(()=>m.openPopup(),350); }
 
+/* ====================== WEATHER (Open-Meteo, no key) ====================== */
+const WX_STORE="indoTrip.wx";
+let wx={}; try{ wx=JSON.parse(localStorage.getItem(WX_STORE)||"{}"); }catch(e){}
+let wxFetching=false;
+function wxEmoji(c){ if(c===0)return"☀️"; if(c<=2)return"🌤️"; if(c===3)return"☁️"; if(c<=48)return"🌫️"; if(c<=67)return"🌦️"; if(c<=82)return"🌧️"; if(c<=86)return"🌧️"; return"⛈️"; }
+function wxKeyOf(l){ return l.lat.toFixed(1)+","+l.lng.toFixed(1); }
+function dayWxLoc(d){ for(const it of d.items){ const l=startLoc(it)||endLoc(it); if(l&&l.lat!=null) return l; } return null; }
+function assignWxLocs(days){ let last=null; days.forEach(d=>{ const l=dayWxLoc(d)||last; d._wxloc=l; if(l) last=l; }); }
+function wxFor(d){ if(!d||!d._wxloc) return null; const e=wx[wxKeyOf(d._wxloc)]; return (e&&e.days&&e.days[d.key])||null; }
+function wxChip(d){ const w=wxFor(d); if(!w) return ""; const pp=(w.pp!=null&&w.pp>=40)?` · ${w.pp}%`:""; return `${wxEmoji(w.code)} ${Math.round(w.tmax)}°${pp}`; }
+function wxHorizonEnd(){ const t=new Date(); t.setDate(t.getDate()+15); return dayKey(t,state.meta.destTz); }
+async function refreshWeather(days){
+  if(!days||!days.length||wxFetching||!navigator.onLine) return;
+  assignWxLocs(days);
+  const today=dayKey(new Date(),state.meta.destTz), hEnd=wxHorizonEnd();
+  const need={};
+  days.forEach(d=>{ const l=d._wxloc; if(!l||d.key<today||d.key>hEnd) return; const k=wxKeyOf(l);
+    const e=wx[k]; if(e && Date.now()-e.t<3*3600e3 && e.days && e.days[d.key]) return;
+    (need[k]=need[k]||{lat:l.lat,lng:l.lng,from:d.key,to:d.key}); if(d.key<need[k].from)need[k].from=d.key; if(d.key>need[k].to)need[k].to=d.key; });
+  const keys=Object.keys(need); if(!keys.length) return;
+  wxFetching=true;
+  try{
+    await Promise.all(keys.map(async k=>{ const n=need[k];
+      const u=`https://api.open-meteo.com/v1/forecast?latitude=${n.lat}&longitude=${n.lng}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&start_date=${n.from}&end_date=${n.to}`;
+      const r=await fetch(u); if(!r.ok) return; const j=await r.json(); const dl=j.daily; if(!dl||!dl.time) return;
+      const e=wx[k]={t:Date.now(), days:(wx[k]&&wx[k].days)||{}};
+      dl.time.forEach((dt,i)=>{ e.days[dt]={code:dl.weather_code[i], tmax:dl.temperature_2m_max[i], tmin:dl.temperature_2m_min[i], pp:dl.precipitation_probability_max?.[i]}; });
+    }));
+    try{ localStorage.setItem(WX_STORE, JSON.stringify(wx)); }catch(e){}
+    updateWxUI(days);
+  }catch(e){} finally{ wxFetching=false; }
+}
+function updateWxUI(days){
+  if(pagerCtl&&pagerCtl.days){ const d=pagerCtl.days[ui.dayIdx]; const el=$("#dbWx"); if(el){ const t=d?wxChip(d):""; el.textContent=t; el.style.display=t?"":"none"; } }
+  document.querySelectorAll("[data-wxdate]").forEach(s=>{ const d=(days||[]).find(x=>x.key===s.dataset.wxdate); const t=d?wxChip(d):""; s.textContent=t; s.style.display=t?"":"none"; });
+}
+
+/* ====================== CALENDAR EXPORT (.ics) ====================== */
+function icsEsc(s){ return String(s||"").replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n"); }
+function icsDate(d){ return d.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,"Z"); }
+function buildICS(){
+  const out=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//INDO 2026//Trip//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:INDO 2026"];
+  let n=0;
+  sortedItems().forEach(it=>{
+    const s=startInstant(it); if(!s) return; n++;
+    let e=endInstant(it); if(!e||e<=s) e=new Date(s.getTime()+3600e3);
+    const t=TYPES[it.type]||TYPES.other;
+    const isLeg=t.legtoo&&it.fromLoc;
+    const lp=[]; const l1=startLoc(it), l2=endLoc(it);
+    if(l1&&(l1.name||l1.address)) lp.push(l1.name||l1.address);
+    if(isLeg&&l2&&(l2.name||l2.address)) lp.push(l2.name||l2.address);
+    const dp=[];
+    if(isLeg&&l1&&l2) dp.push((l1.name||"")+" → "+(l2.name||""));
+    if(it.conf) dp.push("Booking ref: "+it.conf);
+    if(it.notes) dp.push(it.notes);
+    dp.push("INDO 2026 · "+location.origin+location.pathname);
+    const lead=(it.type==="flight")?"-PT3H":(it.type==="transfer")?"-PT1H":"-PT45M";
+    out.push("BEGIN:VEVENT","UID:"+it.id+"@indo2026","DTSTAMP:"+icsDate(new Date()),"DTSTART:"+icsDate(s),"DTEND:"+icsDate(e),
+      "SUMMARY:"+icsEsc(t.emoji+" "+(it.title||t.label)),
+      lp.length?"LOCATION:"+icsEsc(lp.join(" → ")):null,
+      "DESCRIPTION:"+icsEsc(dp.join("\n")),
+      "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsEsc(it.title||t.label),"TRIGGER:"+lead,"END:VALARM",
+      "END:VEVENT");
+  });
+  out.push("END:VCALENDAR");
+  return {text:out.filter(Boolean).join("\r\n"), count:n};
+}
+function downloadICS(){
+  const {text,count}=buildICS();
+  if(!count){ toast("Nothing dated to export yet"); return; }
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([text],{type:"text/calendar;charset=utf-8"}));
+  a.download="INDO-2026.ics"; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },4000);
+  toast(count+" events exported — open the file to add them",true);
+}
+
 /* ====================== SETTINGS ====================== */
 function zoneOptions(sel){ return COMMON_ZONES.map(z=>`<option value="${z.tz}"${z.tz===sel?" selected":""}>${esc(z.label)}</option>`).join(""); }
 function renderSettings(){ const m=state.meta; const ownKey=!!(m.mapsKey||"").trim(); const keyOn=!!getMapsKey();
@@ -1360,6 +1443,7 @@ function renderSettings(){ const m=state.meta; const ownKey=!!(m.mapsKey||"").tr
     </div>
     <div class="field"><label>Time format</label><select class="inp" data-set="clock"><option value="24"${m.clock!=="12"?" selected":""}>24-hour · 20:45</option><option value="12"${m.clock==="12"?" selected":""}>12-hour · 8:45 pm</option></select></div>
     <div class="field"><label>Google Drive folder link</label><input class="inp" data-set="driveUrl" placeholder="https://drive.google.com/drive/folders/…" value="${esc(m.driveUrl)}"><div class="hint">Shows as a one-tap button on the Documents tab.</div></div>
+    <div class="field"><label>Calendar</label><button class="btn ghost" data-act="icsExport" style="justify-content:center">📆 Download trip calendar (.ics)</button><div class="hint">Every flight, transfer and activity lands in your real calendar (with reminders — 3h before flights). Open the downloaded file and iOS/Google Calendar does the rest. Re-download after big changes.</div></div>
     <div class="field"><label>Google Maps API key <span class="keystatus ${keyOn?"on":"off"}">${keyOn?"● live data on":"○ using estimates"}</span></label>
       <input class="inp mono" type="password" data-set="mapsKey" placeholder="${ownKey?'AIza…':'Built-in key active — leave blank'}" value="${esc(m.mapsKey)}">
       <div class="hint">${ownKey?"Using your own key.":"A <b>built-in key</b> is active, so live Google travel times are on for both of you — nothing to enter."} Leave blank to use the built-in one; paste your own here to override.</div>
@@ -1542,6 +1626,7 @@ document.addEventListener("click",e=>{
   const g=e.target.closest("[data-geo]"); if(g){ doGeocode(g.dataset.geo); return; }
   if(!a) return; const act=a.dataset.act,id=a.dataset.id;
   switch(act){
+    case "icsExport": downloadICS(); break;
     case "itinDay": setItinMode("day"); break;
     case "itinAll": setItinMode("all"); break;
     case "add": itemModal(null); break;
