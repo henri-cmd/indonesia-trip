@@ -557,7 +557,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r14";
+const APP_BUILD = "10 Jun 2026 · r15";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -979,19 +979,13 @@ function renderToday(){
     <div class="pager" id="pager"><div class="pager-track" id="pagerTrack">${pages}</div></div>`;
   setupPager(days);
 }
-function dayPage(d,idx,total,todayKey){
-  const isToday=d.key===todayKey;
-  const now=Date.now();
-  const startKey=tripDays()[0]?.key;
-  let countdown="";
-  if(idx===0 && todayKey<d.key){
-    const dd=Math.round((wallToInstant(d.key,"00:00",d.tz)-wallToInstant(todayKey,"00:00",state.meta.destTz))/86400000);
-    countdown=`<div class="countdown"><div class="num">${dd}</div><div class="ct"><b>day${dd===1?"":"s"} to go</b><br>until the trip begins ✈️</div></div>`;
-  }
-  const items=d.items;
-  // status for today
-  let nextMarked=false;
-  const rows=[];
+function countdownHTML(days){ const d=days&&days[0]; if(!d) return ""; const todayKey=dayKey(new Date(),state.meta.destTz); if(todayKey>=d.key) return "";
+  const dd=Math.round((wallToInstant(d.key,"00:00",d.tz)-wallToInstant(todayKey,"00:00",state.meta.destTz))/86400000);
+  return `<div class="countdown"><div class="num">${dd}</div><div class="ct"><b>day${dd===1?"":"s"} to go</b><br>until the trip begins ✈️</div></div>`;
+}
+function dayTimelineHTML(d,todayKey){
+  const isToday=d.key===todayKey; const now=Date.now(); const items=d.items;
+  let nextMarked=false; const rows=[];
   items.forEach((it,i)=>{
     if(isToday){
       const s=startInstant(it)?.getTime(), e=(endInstant(it)||startInstant(it))?.getTime();
@@ -1001,16 +995,16 @@ function dayPage(d,idx,total,todayKey){
     const lg = items[i+1]?legInfo(it,items[i+1]):null;
     if(lg) rows.push(tlLeg(lg));
   });
-  // insert now-line for today
   if(isToday){
     let insertAt=items.filter(it=>startInstant(it)?.getTime()<=now).length;
-    // crude index into rows (each item may be followed by a leg) — find row index
     let count=0,rowIdx=rows.length;
     for(let r=0;r<rows.length;r++){ if(rows[r].__item){ if(count===insertAt){rowIdx=r;break;} count++; } }
     rows.splice(rowIdx,0,{html:`<div class="nowline"><span class="lbl"><span class="pulse"></span>NOW ${fmtTime(new Date(),state.meta.destTz)}</span><span class="ln"></span></div>`});
   }
-  const body = items.length? `<div class="tl">${rows.map(r=>r.html).join("")}</div>` : `<div class="freeday">🌴 No plans — free day</div>`;
-  return `<div class="daypage" data-page="${idx}">${countdown}${body}</div>`;
+  return items.length? `<div class="tl">${rows.map(r=>r.html).join("")}</div>` : `<div class="freeday">🌴 No plans — free day</div>`;
+}
+function dayPage(d,idx,total,todayKey){
+  return `<div class="daypage" data-page="${idx}">${idx===0?countdownHTML(tripDays()):""}${dayTimelineHTML(d,todayKey)}</div>`;
 }
 function tlRow(it,isLast){
   const t=TYPES[it.type]||TYPES.other; const sTz=startTz(it),eTz=endTz(it); const si=startInstant(it),ei=endInstant(it);
@@ -1131,16 +1125,18 @@ function legHTML(a,b){ const lg=legInfo(a,b); if(!lg) return "";
   </div></div>`;
 }
 function renderItinerary(){
-  const items=sortedItems();
-  let html=`<div class="itinbar">${itinToggleHTML()}</div><div class="it-body">`;
-  if(!items.length){
+  const days=tripDays();
+  const todayKey=dayKey(new Date(),state.meta.destTz);
+  let html=`<div class="itinbar">${itinToggleHTML()}</div><div class="it-body alltl">`;
+  if(!days.length){
     html+=`<div class="empty"><div class="big">🌴</div><h3>Plan your Indonesia trip</h3><p>Add flights, hotels, transfers and activities.<br>Each shows on the map with copyable addresses, local times and live travel times.</p>
       <div class="cta"><button class="btn lime" data-act="add">＋ Add first item</button><button class="btn ghost" data-act="addExample">Load a Bali example</button></div></div>`;
   } else {
-    let lastDay=null;
-    items.forEach((it,i)=>{ const si=startInstant(it),tz=startTz(it); const dk=si?dayKey(si,tz):"none";
-      if(dk!==lastDay){ lastDay=dk; html+=`<div class="daybar"><span class="d">${si?fmtDateFull(si,tz):"Unscheduled"}</span><span class="ln"></span>${si?`<span class="dtz">${esc(tzAbbr(tz))}</span>`:""}</div>`; }
-      html+=itemCard(it); const nx=items[i+1]; if(nx&&endLoc(it)&&startLoc(nx)) html+=legHTML(it,nx);
+    html+=countdownHTML(days);
+    days.forEach(d=>{
+      const isToday=d.key===todayKey;
+      html+=`<div class="daybar${isToday?" istoday":""}"><span class="d">${esc(fmtDateFull(d.instant,d.tz))}</span><span class="ln"></span><span class="dtz">${esc(tzAbbr(d.tz))}</span></div>`;
+      html+=dayTimelineHTML(d,todayKey);
     });
   }
   $("#main").innerHTML=html+`</div>`;
