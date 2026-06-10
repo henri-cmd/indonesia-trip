@@ -415,6 +415,39 @@
   @keyframes viewfade{from{opacity:0; transform:translateY(7px)} to{opacity:1; transform:none}}
   .loc-brief{display:flex; align-items:center; gap:6px; margin-top:5px; font-size:12.5px; color:var(--muted)}
   .loc-brief .nm{color:var(--ink)}
+
+  /* center create FAB */
+  .tabbar{overflow:visible}
+  .tabbar .fab{flex:0 0 52px; width:52px; height:52px; padding:0; gap:0; border-radius:50%; background:var(--accent); color:var(--ink); font-size:27px; font-weight:400; line-height:1; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(95,139,6,.42); transform:translateY(-16px); border:3px solid var(--bg); transition:transform .12s var(--ease)}
+  .tabbar .fab:active{transform:translateY(-16px) scale(.9)}
+  @media(min-width:860px){ .tabbar .fab{display:none} }
+
+  /* hotspots */
+  .hs-body{padding:10px 16px 18px}
+  .hs-card{border:1px solid var(--line); border-radius:14px; background:var(--card); margin:10px 0; overflow:hidden; cursor:pointer; transition:border-color .15s, box-shadow .15s}
+  .hs-card:hover{border-color:var(--line-strong)}
+  .hs-card.expanded{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft)}
+  .hs-head{display:flex; gap:12px; padding:12px}
+  .hs-photo{flex:0 0 62px; width:62px; height:62px; border-radius:11px; background-size:cover; background-position:center; background-color:var(--bg)}
+  .hs-photo.hs-noimg{display:flex; align-items:center; justify-content:center; font-size:27px}
+  .hs-info{flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center}
+  .hs-top{display:flex; align-items:baseline; gap:8px}
+  .hs-name{font-weight:700; font-size:16px; letter-spacing:-.01em; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .hs-dist{flex:none; font-size:12px; font-weight:600; color:var(--blue); background:#e7f0ff; padding:2px 8px; border-radius:20px}
+  .hs-cat{font-size:12.5px; color:var(--muted); margin-top:3px}
+  .hs-expand{max-height:0; overflow:hidden; opacity:0; transition:max-height .33s var(--ease), opacity .25s; padding:0 12px}
+  .hs-card.expanded .hs-expand{opacity:1; padding-bottom:12px}
+  .hs-link{margin-top:7px; font-size:13px}
+  .hs-actions{display:flex; gap:7px; flex-wrap:wrap; margin-top:12px}
+  .hs-gallery,.hs-photos{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+  .hs-thumb{position:relative; width:62px; height:62px; border-radius:10px; background-size:cover; background-position:center; background-color:var(--bg); display:block; border:1px solid var(--line)}
+  .hs-rm{position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--ink); color:#fff; font-size:11px; display:flex; align-items:center; justify-content:center}
+
+  /* create menu */
+  .create-grid{display:flex; flex-direction:column; gap:10px; padding:8px 0 4px}
+  .create-opt{display:flex; align-items:center; gap:14px; padding:16px; border:1px solid var(--line); border-radius:14px; background:var(--card); font-weight:600; font-size:15px; text-align:left}
+  .create-opt:hover{border-color:var(--ink); background:var(--bg)}
+  .create-opt .e{font-size:24px}
 </style>
 </head>
 <body data-view="today">
@@ -438,6 +471,7 @@
     <nav class="tabs desktop-only" id="topnav">
       <button data-view="today" class="active">Today</button>
       <button data-view="itinerary">Plan</button>
+      <button data-view="hotspots">Hotspots</button>
       <button data-view="documents">Docs</button>
     </nav>
     <button class="gear maptoggle" id="mapToggle" title="Show / hide map">🗺</button>
@@ -451,7 +485,8 @@
     <div id="map"></div>
     <div class="map-foot">
       <div class="legend" id="legend"></div>
-      <button class="btn ghost sm" id="satBtn" style="margin-left:auto">🛰 Satellite</button>
+      <button class="btn ghost sm" id="meBtn" style="margin-left:auto">◎ Me</button>
+      <button class="btn ghost sm" id="satBtn">🛰 Satellite</button>
       <button class="btn ghost sm" id="fitBtn">⤢ Fit all</button>
     </div>
   </section>
@@ -461,6 +496,8 @@
   <span class="tab-ind" id="tabInd"></span>
   <button data-view="today" class="active"><span class="ti">📅</span><span>Today</span></button>
   <button data-view="itinerary"><span class="ti">🗒️</span><span>Plan</span></button>
+  <button class="fab" id="fab" aria-label="Create">＋</button>
+  <button data-view="hotspots"><span class="ti">📍</span><span>Hotspots</span></button>
   <button data-view="documents"><span class="ti">📁</span><span>Docs</span></button>
 </nav>
 
@@ -650,6 +687,7 @@ function pinIcon(type){ const t=TYPES[type]||TYPES.other; const color=TYPE_HEX[t
   return L.divIcon({className:"",html:`<div class="epin" style="--c:${color}"><span>${t.emoji}</span></div>`,iconSize:[30,37],iconAnchor:[15,35],popupAnchor:[0,-32]}); }
 function refreshMap(){
   if(!map) return;
+  if(ui.view==="hotspots"){ renderHotspotMarkers(); return; }
   markerLayer.clearLayers(); lineLayer.clearLayers(); markersById={};
   const allPts=[], emphPts=[], linePts=[]; let n=0;
   sortedItems().forEach(it=>{
@@ -832,7 +870,8 @@ function moveTabInd(){
 function setView(v){
   ui.view=v; document.body.dataset.view=v;
   document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
-  if(v==="itinerary"||v==="documents"||v==="settings") applyMapFocus(null);
+  if(v==="itinerary"||v==="documents"||v==="settings"||v==="hotspots") applyMapFocus(null);
+  if(v==="hotspots" && geoState==="off") startGeo();
   renderMain();
   const mc=$("#main"); if(mc){ mc.style.animation="none"; void mc.offsetWidth; mc.style.animation="viewfade .24s var(--ease)"; }
   moveTabInd(); syncHeadH();
@@ -841,6 +880,7 @@ function setView(v){
 function renderMain(){
   if(ui.view==="today") renderToday();
   else if(ui.view==="itinerary") renderItinerary();
+  else if(ui.view==="hotspots") renderHotspots();
   else if(ui.view==="documents") renderDocuments();
   else if(ui.view==="settings") renderSettings();
   // map view leaves #main as-is
@@ -1076,6 +1116,146 @@ function renderDocuments(){
   $("#main").innerHTML=html+`</div>`;
 }
 
+/* ====================== HOTSPOTS ====================== */
+const HOTSPOT_TYPES = {
+  food:{emoji:"🍽️",label:"Food & drink"}, sight:{emoji:"📸",label:"Sight"},
+  activity:{emoji:"🎟️",label:"Activity"}, show:{emoji:"🎭",label:"Show / event"},
+  beach:{emoji:"🏖️",label:"Beach"}, nature:{emoji:"🌿",label:"Nature"},
+  shop:{emoji:"🛍️",label:"Shop"}, other:{emoji:"📍",label:"Other"}
+};
+let userLoc=null, userMarker=null, geoState="off"; // off | locating | on | denied
+function startGeo(){
+  if(!navigator.geolocation){ geoState="denied"; if(ui.view==="hotspots") renderHotspots(); return; }
+  if(geoState==="on"){ recenterMe(); return; }
+  geoState="locating"; if(ui.view==="hotspots") renderHotspots();
+  navigator.geolocation.watchPosition(
+    p=>{ userLoc={lat:p.coords.latitude,lng:p.coords.longitude}; geoState="on"; updateUserMarker(); if(ui.view==="hotspots") renderHotspots(); },
+    ()=>{ geoState="denied"; if(ui.view==="hotspots") renderHotspots(); },
+    {enableHighAccuracy:false, maximumAge:120000, timeout:20000});
+}
+function updateUserMarker(){ if(!map||!userLoc) return; const ll=[userLoc.lat,userLoc.lng];
+  if(!userMarker){ userMarker=L.circleMarker(ll,{radius:7,weight:3,color:"#fff",fillColor:"#2f6fed",fillOpacity:1}).addTo(map); userMarker.bindPopup("📍 You are here"); }
+  else userMarker.setLatLng(ll); }
+function recenterMe(){ if(!map) return; if(userLoc) map.flyTo([userLoc.lat,userLoc.lng], Math.max(map.getZoom(),14), {duration:.5}); else startGeo(); }
+function refLoc(){ return userLoc || {lat:-8.5,lng:115.2}; }
+function hotspotDist(h){ const l=h.location; if(!l||l.lat==null) return Infinity; return haversineKm(refLoc(), l); }
+function sortedHotspots(){ return [...(state.hotspots||[])].sort((a,b)=>hotspotDist(a)-hotspotDist(b)); }
+function distLabel(km){ return km<1?Math.round(km*1000)+" m":km.toFixed(km<10?1:0)+" km"; }
+
+function renderHotspots(){
+  const list=sortedHotspots();
+  const locChip = geoState==="on" ? '<span class="chip" style="background:#e7f0ff;border-color:#cfe0ff;color:#2f6fed">◎ closest first</span>'
+    : geoState==="locating" ? '<span class="chip">◎ locating…</span>'
+    : geoState==="denied" ? '<span class="chip">◎ location off</span>'
+    : '<button class="btn ghost sm" data-act="useLoc">◎ Use my location</button>';
+  let html=`<div class="sec-head"><h2>Hotspots</h2><div class="sp"></div>${locChip}<button class="btn lime" data-act="addHotspot">＋ Add</button></div><div class="hs-body">`;
+  if(!list.length){
+    html+=`<div class="empty"><div class="big">📍</div><h3>No hotspots yet</h3><p>Save places you want to check out — food, sights, activities, shops. Paste a Google Maps link and we'll grab the details; they sort by closest to you.</p>
+      <div class="cta"><button class="btn lime" data-act="addHotspot">＋ Add a hotspot</button></div></div>`;
+  } else html+=list.map(hotspotCard).join("");
+  $("#main").innerHTML=html+`</div>`;
+}
+function hotspotCard(h){
+  const t=HOTSPOT_TYPES[h.type]||HOTSPOT_TYPES.other; const d=hotspotDist(h); const exp=h.id===ui.expandedId;
+  const ph=h.photos&&h.photos[0];
+  const thumb = ph?`<div class="hs-photo" style="background-image:url('${esc(ph)}')"></div>`:`<div class="hs-photo hs-noimg">${t.emoji}</div>`;
+  const gq=h.location&&h.location.lat!=null?`${h.location.lat},${h.location.lng}`:encodeURIComponent(h.location?.address||h.location?.name||h.name||"");
+  const gmap=`https://www.google.com/maps/search/?api=1&query=${gq}`;
+  const dir=userLoc?`https://www.google.com/maps/dir/?api=1&origin=${userLoc.lat},${userLoc.lng}&destination=${gq}&travelmode=driving`:gmap;
+  return `<div class="hs-card ${exp?'expanded':''}" data-hs="${h.id}">
+    <div class="hs-head">${thumb}
+      <div class="hs-info"><div class="hs-top"><span class="hs-name">${esc(h.name||t.label)}</span>${(geoState==="on"&&d!==Infinity)?`<span class="hs-dist">${distLabel(d)}</span>`:""}</div>
+      <div class="hs-cat">${t.emoji} ${t.label}${h.location?.name?` · ${esc(h.location.name)}`:""}</div></div></div>
+    <div class="hs-expand"${exp?' style="max-height:none"':''}>
+      ${h.location&&(h.location.name||h.location.address)?`<div class="loc"><span class="pin">📍</span><span><span style="font-weight:500">${esc(h.location.name||"")}</span>${h.location.name&&h.location.address?"<br>":""}<span class="addr">${esc(h.location.address||"")}</span></span></div>`:""}
+      ${h.url?`<div class="hs-link"><a href="${esc(/^https?:/.test(h.url)?h.url:'https://'+h.url)}" target="_blank" rel="noopener">🔗 ${esc(h.url.replace(/^https?:\/\//,'').slice(0,40))}</a></div>`:""}
+      ${h.notes?`<div class="note">${esc(h.notes)}</div>`:""}
+      ${(h.photos&&h.photos.length>1)?`<div class="hs-gallery">${h.photos.slice(1).map(u=>`<a class="hs-thumb" href="${esc(u)}" target="_blank" rel="noopener" style="background-image:url('${esc(u)}')"></a>`).join("")}</div>`:""}
+      <div class="hs-actions">
+        <a class="btn ghost sm" href="${dir}" target="_blank" rel="noopener">🧭 Directions</a>
+        <a class="btn ghost sm" href="${gmap}" target="_blank" rel="noopener">↗ Maps</a>
+        ${(h.location?.lat!=null&&!isMobile())?`<button class="btn ghost sm" data-act="hsFocus" data-id="${h.id}">◎ Map</button>`:""}
+        <button class="btn ghost sm" data-act="editHotspot" data-id="${h.id}">✎ Edit</button>
+      </div>
+    </div></div>`;
+}
+function setHsExpanded(id,on){
+  const el=document.querySelector('.hs-card[data-hs="'+cssEsc(id)+'"]'); if(!el) return;
+  el.classList.toggle('expanded',on);
+  const exp=el.querySelector('.hs-expand'); if(!exp) return;
+  if(on){ exp.style.maxHeight=exp.scrollHeight+'px'; clearTimeout(exp._t); exp._t=setTimeout(()=>{ if(el.classList.contains('expanded')) exp.style.maxHeight='none'; },360); }
+  else { exp.style.maxHeight=exp.scrollHeight+'px'; void exp.offsetHeight; exp.style.maxHeight='0px'; }
+}
+function toggleHotspot(id){
+  if(!id) return; const now=Date.now(); if(id===_tapId && now-_tapT<400) return; _tapId=id; _tapT=now;
+  if(ui.expandedId===id){ setHsExpanded(id,false); ui.expandedId=null; return; }
+  if(ui.expandedId) setHsExpanded(ui.expandedId,false);
+  ui.expandedId=id; setHsExpanded(id,true);
+  const h=(state.hotspots||[]).find(x=>x.id===id);
+  if(h&&h.location&&h.location.lat!=null&&!isMobile()&&map) map.flyTo([h.location.lat,h.location.lng],Math.max(map.getZoom(),14),{duration:.5});
+}
+function hotspotModal(item){
+  draft = item ? JSON.parse(JSON.stringify(item)) : {id:uid(),type:"food",name:"",location:{},notes:"",photos:[],url:""};
+  const typeBtns=Object.entries(HOTSPOT_TYPES).map(([k,t])=>`<button type="button" class="typebtn${draft.type===k?" on":""}" data-htype="${k}"><span class="e">${t.emoji}</span>${t.label}</button>`).join("");
+  openModal(`<div class="mh"><h3>${item?"Edit hotspot":"Add hotspot"}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
+  <div class="mb">
+    <div class="field"><label>Type</label><div class="typegrid" id="htypeGrid">${typeBtns}</div></div>
+    <div class="field"><label>Name</label><input class="inp" id="h-name" value="${esc(draft.name)}" placeholder="e.g. Locavore"></div>
+    ${locFieldHTML("hsloc","Location — paste a Google Maps link or search",draft.location)}
+    <div class="field"><label>Notes (optional)</label><textarea class="inp" id="h-notes" placeholder="Why you want to go, hours, who recommended it…">${esc(draft.notes||"")}</textarea></div>
+    <div class="field"><label>Website / link (optional)</label><input class="inp" id="h-url" value="${esc(draft.url||"")}" placeholder="https://…"></div>
+    <div class="field"><label>Photos</label>
+      <div class="hs-photos" id="hPhotos">${(draft.photos||[]).map((u,i)=>`<div class="hs-thumb" style="background-image:url('${esc(u)}')"><button class="hs-rm" data-act="rmPhoto" data-i="${i}">✕</button></div>`).join("")}</div>
+      <label class="btn ghost sm" style="margin-top:8px;display:inline-flex">＋ Add photo<input type="file" accept="image/*" id="hFile" multiple style="display:none"></label>
+      <div class="hint" id="hUpStatus">${fstore?"Photos upload to your shared trip so Elisa sees them too.":"Photo upload needs cloud sync (Settings)."}</div>
+    </div>
+  </div>
+  <div class="mf">${item?`<button class="btn danger" data-act="delHotspot" data-id="${draft.id}">Delete</button>`:""}
+    <div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn lime" data-act="saveHotspot">${item?"Save":"Add"}</button></div></div>`);
+  renderLocBlock&&0; // no-op (locFieldHTML already inlined above)
+  $("#htypeGrid").addEventListener("click",e=>{ const b=e.target.closest(".typebtn"); if(!b)return; draft.type=b.dataset.htype; collectHotspotForm(); hotspotModal(draft); });
+  $("#hFile")?.addEventListener("change",e=>handlePhotoFiles(e.target.files));
+}
+function collectHotspotForm(){
+  if(!$("#h-name")) return;
+  draft.name=$("#h-name").value.trim(); draft.notes=$("#h-notes").value; draft.url=$("#h-url").value.trim();
+  const qEl=$("#hsloc-q"); if(qEl){ const picked=(draft._tmp&&draft._tmp.hsloc)||{}; const name=qEl.value.trim(), addr=$("#hsloc-addr").value.trim(); const o={name,address:addr}; if(picked.lat!=null){o.lat=picked.lat;o.lng=picked.lng;if(!o.name)o.name=picked.name;} draft.location=(o.name||o.address||o.lat!=null)?o:{}; }
+}
+async function handlePhotoFiles(files){
+  if(!fstore){ toast("Photo upload needs cloud sync"); return; }
+  const st=$("#hUpStatus"); if(st) st.textContent="Uploading…"; draft.photos=draft.photos||[];
+  for(const f of files){ try{ const r=fstore.ref("trips/"+tripId+"/hs/"+draft.id+"/"+uid()); await r.put(f); draft.photos.push(await r.getDownloadURL()); }catch(e){ if(st) st.textContent="Upload failed"; } }
+  const row=$("#hPhotos"); if(row) row.innerHTML=draft.photos.map((u,i)=>`<div class="hs-thumb" style="background-image:url('${esc(u)}')"><button class="hs-rm" data-act="rmPhoto" data-i="${i}">✕</button></div>`).join("");
+  if(st) st.textContent="Done — "+draft.photos.length+" photo"+(draft.photos.length===1?"":"s")+".";
+}
+function saveHotspot(){
+  collectHotspotForm(); if(!draft.name){ toast("Give it a name"); return; } delete draft._tmp;
+  state.hotspots=state.hotspots||[];
+  const i=state.hotspots.findIndex(x=>x.id===draft.id); if(i>=0) state.hotspots[i]=draft; else state.hotspots.push(draft);
+  save(); syncSet("hotspots/"+draft.id, draft); closeModal(); refreshMap(); renderMain(); toast("Saved",true);
+}
+function openCreateMenu(){
+  openModal(`<div class="mh"><h3>Create</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
+  <div class="mb"><div class="create-grid">
+    <button class="create-opt" data-act="newItem"><span class="e">🗓️</span>Itinerary item</button>
+    <button class="create-opt" data-act="newHotspot"><span class="e">📍</span>Hotspot</button>
+    <button class="create-opt" data-act="newDoc"><span class="e">📎</span>Document</button>
+  </div></div>`);
+}
+function renderHotspotMarkers(){
+  if(!map) return; markerLayer.clearLayers(); lineLayer.clearLayers(); markersById={};
+  const pts=[];
+  sortedHotspots().forEach(h=>{ const l=h.location; if(!l||l.lat==null) return; const t=HOTSPOT_TYPES[h.type]||HOTSPOT_TYPES.other; const ll=[l.lat,l.lng]; pts.push(ll);
+    const m=L.marker(ll,{icon:L.divIcon({className:"",html:`<div class="epin" style="--c:#e0483d"><span>${t.emoji}</span></div>`,iconSize:[30,37],iconAnchor:[15,35],popupAnchor:[0,-32]})}).addTo(markerLayer);
+    const gmap=`https://www.google.com/maps/search/?api=1&query=${l.lat},${l.lng}`;
+    m.bindPopup(`<div class="pop"><div class="pt">${t.emoji} ${esc(h.name||t.label)}</div>${l.address?`<div class="pa">${esc(l.address)}</div>`:""}<div class="pactions"><a href="${gmap}" target="_blank" rel="noopener">↗ Maps</a></div></div>`,{maxWidth:240});
+    markersById[h.id]=m;
+  });
+  if(pts.length && map.getSize().x>0){ try{ map.fitBounds(L.latLngBounds(pts).pad(.3),{maxZoom:14}); }catch(e){} }
+  $("#legend").innerHTML = pts.length?'<span><i style="background:#e0483d"></i>Saved hotspots</span>':'<span style="color:var(--faint)">Add a hotspot to see it here</span>';
+}
+function hsFocus(id){ const h=(state.hotspots||[]).find(x=>x.id===id); if(!h||!h.location||h.location.lat==null||!map) return; map.flyTo([h.location.lat,h.location.lng],Math.max(map.getZoom(),15),{duration:.5}); const m=markersById[id]; if(m) setTimeout(()=>m.openPopup(),350); }
+
 /* ====================== SETTINGS ====================== */
 function zoneOptions(sel){ return COMMON_ZONES.map(z=>`<option value="${z.tz}"${z.tz===sel?" selected":""}>${esc(z.label)}</option>`).join(""); }
 function renderSettings(){ const m=state.meta; const keyOn=!!m.mapsKey;
@@ -1155,7 +1335,10 @@ function locFieldHTML(prefix,label,loc){ loc=loc||{};
 function renderLocBlock(){ const isLeg=TYPES[draft.type]?.legtoo;
   $("#locBlock").innerHTML=isLeg?(locFieldHTML("from","From",draft.fromLoc)+locFieldHTML("to","To",draft.toLoc)):locFieldHTML("main","Location",draft.location); }
 async function doGeocode(prefix){ const q=$("#"+prefix+"-q").value.trim(); if(!q) return;
-  const coords=parseLatLng(q); if(coords){ setLoc(prefix,{name:q.length>40?"Pinned location":q,address:"",lat:coords.lat,lng:coords.lng}); return; }
+  const coords=parseLatLng(q);
+  if(coords){ setLoc(prefix,{name:"Locating…",address:"",lat:coords.lat,lng:coords.lng});
+    reverseGeocode(coords).then(info=>setLoc(prefix,{name:info.name||"Pinned location",address:info.address||"",lat:coords.lat,lng:coords.lng}));
+    return; }
   const res=$("#"+prefix+"-res"); res.innerHTML='<button disabled>Searching…</button>'; res.classList.add("show");
   try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(q)}`,{headers:{"Accept":"application/json"}}); const arr=await r.json();
     if(!arr.length){ res.innerHTML='<button disabled>No matches — type an address or paste coordinates</button>'; return; }
@@ -1211,10 +1394,21 @@ document.addEventListener("click",e=>{
     if(card.classList.contains("tl-card")) toggleItem(card.dataset.card);
     else focusItem(card.dataset.card);
     return; }
+  const hs=e.target.closest("[data-hs]"); if(hs&&!a){ if(e.target.closest("a")) return; toggleHotspot(hs.dataset.hs); return; }
   const g=e.target.closest("[data-geo]"); if(g){ doGeocode(g.dataset.geo); return; }
   if(!a) return; const act=a.dataset.act,id=a.dataset.id;
   switch(act){
     case "add": itemModal(null); break;
+    case "addHotspot": hotspotModal(null); break;
+    case "editHotspot": hotspotModal((state.hotspots||[]).find(x=>x.id===id)); break;
+    case "saveHotspot": saveHotspot(); break;
+    case "delHotspot": if(confirm("Delete this hotspot?")){ state.hotspots=(state.hotspots||[]).filter(x=>x.id!==id); save(); syncRemove("hotspots/"+id); closeModal(); refreshMap(); renderMain(); toast("Deleted",true);} break;
+    case "hsFocus": hsFocus(id); break;
+    case "useLoc": startGeo(); break;
+    case "rmPhoto": { const i=+a.dataset.i; if(draft&&draft.photos){ draft.photos.splice(i,1); const row=$("#hPhotos"); if(row) row.innerHTML=draft.photos.map((u,k)=>`<div class="hs-thumb" style="background-image:url('${esc(u)}')"><button class="hs-rm" data-act="rmPhoto" data-i="${k}">✕</button></div>`).join(""); } break; }
+    case "newItem": closeModal(); itemModal(null); break;
+    case "newHotspot": closeModal(); hotspotModal(null); break;
+    case "newDoc": closeModal(); docModal(); break;
     case "togglePills": { const s=$("#daystrip"); if(s){ s.classList.toggle("collapsed"); $("#datebar")?.classList.toggle("open", !s.classList.contains("collapsed")); } break; }
     case "goToday": { if(pagerCtl){ pagerCtl.setTo(currentDayIndex(pagerCtl.days),true); $("#daystrip")?.classList.add("collapsed"); $("#datebar")?.classList.remove("open"); } break; }
     case "edit": closeDetail(); itemModal(state.items.find(x=>x.id===id)); break;
@@ -1249,8 +1443,10 @@ document.addEventListener("input",e=>{ const s=e.target.closest("[data-set]"); i
 document.addEventListener("change",e=>{ const s=e.target.closest("[data-set]"); if(s&&s.dataset.set==="mapsKey"){ googleReady=false; googleLoading=false; legCache.clear(); loadGoogle(); renderSettings(); } });
 document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
 $("#tripSub").addEventListener("input",e=>{ state.meta.sub=e.target.value; save(); pushMeta(); });
-$("#fitBtn").addEventListener("click",()=>{ applyMapFocus(null); });
+$("#fitBtn").addEventListener("click",()=>{ if(ui.view==="hotspots") refreshMap(); else applyMapFocus(null); });
 $("#satBtn").addEventListener("click",toggleSat);
+$("#meBtn")?.addEventListener("click",recenterMe);
+$("#fab")?.addEventListener("click",openCreateMenu);
 function setMapCollapsed(c){ document.body.classList.toggle("map-collapsed", c); localStorage.setItem("indoTrip.mapCollapsed", c?"1":""); if(map) setTimeout(()=>{ try{ map.invalidateSize(); }catch(e){} },300); }
 $("#mapToggle").addEventListener("click",()=>setMapCollapsed(!document.body.classList.contains("map-collapsed")));
 /* gesture: pull down at the very top of the list to bring the map back (collapse via the 🗺 button) */
