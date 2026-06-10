@@ -874,7 +874,7 @@ function moveTabInd(){
 }
 function setView(v){
   ui.view=v; document.body.dataset.view=v;
-  document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
+  document.querySelectorAll("button[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
   if(v==="itinerary"||v==="documents"||v==="settings"||v==="hotspots") applyMapFocus(null);
   if(v==="hotspots" && geoState==="off") startGeo();
   renderMain();
@@ -1446,7 +1446,7 @@ document.addEventListener("click",e=>{
 document.addEventListener("input",e=>{ const s=e.target.closest("[data-set]"); if(!s) return; state.meta[s.dataset.set]=s.value.trim(); save(); pushMeta();
   if(s.dataset.set==="destTz"||s.dataset.set==="homeTz"||s.dataset.set==="clock") renderClocks(); });
 document.addEventListener("change",e=>{ const s=e.target.closest("[data-set]"); if(s&&s.dataset.set==="mapsKey"){ googleReady=false; googleLoading=false; legCache.clear(); loadGoogle(); renderSettings(); } });
-document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
+document.querySelectorAll("button[data-view]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view))); // button[...] — body also carries data-view (CSS state); binding it re-rendered the view on EVERY click
 $("#tripSub").addEventListener("input",e=>{ state.meta.sub=e.target.value; save(); pushMeta(); });
 $("#fitBtn").addEventListener("click",()=>{ if(ui.view==="hotspots") refreshMap(); else applyMapFocus(null); });
 $("#satBtn").addEventListener("click",toggleSat);
