@@ -472,7 +472,7 @@
   .create-opt .e{font-size:24px}
 
   /* Day / All segmented toggle (Itinerary tab) */
-  .itinbar{display:flex; padding:9px 16px 4px}
+  .itinbar{display:flex; justify-content:flex-end; padding:9px 16px 4px}
   .sec-head.itinhead{align-items:center}
   .segtoggle{display:inline-flex; background:var(--bg); border:1px solid var(--line); border-radius:11px; padding:3px; gap:2px}
   .segtoggle button{padding:6px 17px; border-radius:8px; font-size:13px; font-weight:600; color:var(--muted); transition:color .15s, background .15s, box-shadow .15s}
@@ -559,7 +559,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r16";
+const APP_BUILD = "10 Jun 2026 · r17";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -968,7 +968,6 @@ function renderToday(){
   $("#main").innerHTML=`
     <div class="todayhead">
       <div class="datebar" id="datebar">
-        ${itinToggleHTML()}
         <button class="datemain" data-act="togglePills">
           <span class="dbig" id="dbDate">${esc(fmtDateShort(cur.instant,cur.tz))}</span>
           <span class="chev">▾</span>
@@ -976,6 +975,7 @@ function renderToday(){
           <span class="dtz" id="dbTz">${esc(tzAbbr(cur.tz))}</span>
         </button>
         <button class="gotoday" data-act="goToday" title="Go to current day">⊙</button>
+        ${itinToggleHTML()}
       </div>
       <div class="daystrip collapsed" id="daystrip">${pills}</div>
     </div>
