@@ -394,7 +394,9 @@
 
   /* collapsible date selector */
   .todayhead{position:sticky; top:0; z-index:6; background:var(--card)}
-  .datebar{display:flex; align-items:center; gap:10px; padding:14px 16px 8px; background:var(--card)}
+  .datebar{display:flex; align-items:center; gap:9px; padding:12px 16px 8px; background:var(--card)}
+  .datebar .segtoggle{flex:none; padding:2px}
+  .datebar .segtoggle button{padding:5px 12px; font-size:12px}
   .datemain{display:flex; align-items:baseline; gap:7px; flex-wrap:nowrap; flex:1; min-width:0; overflow:hidden; text-align:left; padding:0}
   .datemain .dbig{font-size:18px; font-weight:700; letter-spacing:-.015em; white-space:nowrap}
   .datemain .dsub{color:var(--muted); font-size:11px; white-space:nowrap}
@@ -557,7 +559,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r15";
+const APP_BUILD = "10 Jun 2026 · r16";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -679,6 +681,7 @@ function wallToInstant(dateStr,timeStr,tz){ if(!dateStr) return null;
   return inst; }
 function fmtTime(inst,tz){ if(!inst) return ""; const h12=state.meta.clock==="12"; return new Intl.DateTimeFormat("en-GB",{timeZone:tz,hour:h12?"numeric":"2-digit",minute:"2-digit",hour12:h12}).format(inst); }
 function fmtDateFull(inst,tz){ return inst?new Intl.DateTimeFormat("en-GB",{timeZone:tz,weekday:"long",day:"numeric",month:"long"}).format(inst):""; }
+function fmtDateShort(inst,tz){ return inst?new Intl.DateTimeFormat("en-GB",{timeZone:tz,weekday:"short",day:"numeric",month:"short"}).format(inst):""; }
 function fmtDateShort(inst,tz){ return inst?new Intl.DateTimeFormat("en-GB",{timeZone:tz,weekday:"short",day:"numeric",month:"short"}).format(inst):""; }
 function fmtWeekday(inst,tz){ return inst?new Intl.DateTimeFormat("en-GB",{timeZone:tz,weekday:"short"}).format(inst):""; }
 function fmtDayNum(inst,tz){ return inst?new Intl.DateTimeFormat("en-GB",{timeZone:tz,day:"numeric"}).format(inst):""; }
@@ -964,10 +967,10 @@ function renderToday(){
   const pages=days.map((d,i)=>dayPage(d,i,days.length,todayKey)).join("");
   $("#main").innerHTML=`
     <div class="todayhead">
-      <div class="itinbar">${itinToggleHTML()}</div>
       <div class="datebar" id="datebar">
+        ${itinToggleHTML()}
         <button class="datemain" data-act="togglePills">
-          <span class="dbig" id="dbDate">${esc(fmtDateFull(cur.instant,cur.tz))}</span>
+          <span class="dbig" id="dbDate">${esc(fmtDateShort(cur.instant,cur.tz))}</span>
           <span class="chev">▾</span>
           <span class="dsub" id="dbSub">Day ${ui.dayIdx+1}/${days.length}</span>
           <span class="dtz" id="dbTz">${esc(tzAbbr(cur.tz))}</span>
@@ -1046,7 +1049,7 @@ function tlLeg(lg){
       · <a href="${lg.gmapDir}" target="_blank" rel="noopener">route ↗</a></div></div>`,
     __leg:true, lg};
 }
-function updateDateBar(days,i){ const d=days[i]; if(!d) return; const D=$("#dbDate"),S=$("#dbSub"),T=$("#dbTz"); if(D)D.textContent=fmtDateFull(d.instant,d.tz); if(S)S.textContent="Day "+(i+1)+"/"+days.length; if(T)T.textContent=tzAbbr(d.tz); }
+function updateDateBar(days,i){ const d=days[i]; if(!d) return; const D=$("#dbDate"),S=$("#dbSub"),T=$("#dbTz"); if(D)D.textContent=fmtDateShort(d.instant,d.tz); if(S)S.textContent="Day "+(i+1)+"/"+days.length; if(T)T.textContent=tzAbbr(d.tz); }
 function setupPager(days){
   const pager=$("#pager"), track=$("#pagerTrack"), strip=$("#daystrip"); if(!pager||!track) return;
   const w=()=>pager.clientWidth||1;
