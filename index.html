@@ -90,7 +90,7 @@
 
   /* ---------- Bottom tab bar (mobile only) ---------- */
   .tabbar{position:fixed; left:0; right:0; bottom:0; z-index:50; display:none; justify-content:space-around;
-    background:rgba(255,255,255,.84); backdrop-filter:saturate(180%) blur(22px); border-top:1px solid var(--line); padding-bottom:var(--bar-pad)}
+    background:rgba(244,245,240,.88); backdrop-filter:saturate(180%) blur(22px); border-top:1px solid var(--line); padding-bottom:var(--bar-pad)}
   .tabbar button{flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 0 5px; color:var(--faint); font-size:10px; font-weight:600; transition:color .15s}
   .tabbar button .ti{font-size:20px; line-height:1; transition:transform .15s var(--ease)}
   .tabbar button .ti{padding:3px 16px; border-radius:20px; transition:background .15s, transform .15s var(--ease)}
@@ -402,8 +402,11 @@
     body[data-view="today"] .map-foot #meBtn, body[data-view="today"] .map-foot #satBtn{width:34px; height:34px; padding:0; border-radius:50%; font-size:14px}
     body[data-view="today"] .map-foot #meBtn .mlb, body[data-view="today"] .map-foot #satBtn .mlb{display:none}
     body[data-view="today"] .map-foot #fitBtn{margin-left:auto}
-    body[data-view="today"] .mapwrap .leaflet-bottom .leaflet-control{margin-bottom:38px}
   }
+  /* map attribution: tucked top-right, tiny and quiet (moved off the bottom where it hid the from-you bar) */
+  .leaflet-control-attribution{font-size:9px !important; line-height:1.5; background:rgba(255,255,255,.72) !important; color:#8a8d7f; padding:1px 7px; border-radius:0 0 0 9px; margin:0 !important}
+  .leaflet-control-attribution a{color:#7d8170}
+  .leaflet-top.leaflet-right .leaflet-control{margin:0}
 
   /* collapsible date selector */
   .todayhead{position:sticky; top:0; z-index:6; background:var(--card)}
@@ -474,10 +477,9 @@
   .hs-rm{position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--ink); color:#fff; font-size:11px; display:flex; align-items:center; justify-content:center}
 
   /* "from you" nav estimate — floats at the bottom of the map */
-  .fromme{position:absolute; left:9px; bottom:48px; z-index:5; display:none; align-items:center; gap:7px; max-width:calc(100% - 18px);
-    background:rgba(255,255,255,.94); backdrop-filter:blur(8px); border-radius:12px; padding:7px 11px; font-size:12.5px; box-shadow:0 2px 10px rgba(0,0,0,.18); flex-wrap:wrap}
-  .fromme .fl{font-weight:700; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  .fromme a{font-weight:600; white-space:nowrap}
+  .fromme{position:absolute; left:9px; bottom:48px; z-index:5; display:none; align-items:center; gap:5px; max-width:calc(100% - 18px);
+    background:rgba(255,255,255,.94); backdrop-filter:blur(8px); border-radius:20px; padding:6px 12px; font-size:12px; box-shadow:0 2px 10px rgba(0,0,0,.18); white-space:nowrap; overflow:hidden}
+  .fromme a{font-weight:700; white-space:nowrap}
   @media(min-width:860px){ .fromme{bottom:58px} }
 
   /* nearby hotspots inside an expanded item */
@@ -586,7 +588,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r26";
+const APP_BUILD = "10 Jun 2026 · r27";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -737,7 +739,8 @@ function itemDayKey(it){ const si=startInstant(it); return si?dayKey(si,startTz(
 let map, markerLayer, lineLayer, markersById={};
 let baseStd, baseSat, satLabels, satOn=false;
 function initMap(){
-  map=L.map("map",{zoomControl:true,scrollWheelZoom:true}).setView([-8.55,115.2],9);
+  map=L.map("map",{zoomControl:true,scrollWheelZoom:true,attributionControl:false}).setView([-8.55,115.2],9);
+  L.control.attribution({position:"topright",prefix:false}).addTo(map);
   baseStd=L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{attribution:'&copy; OpenStreetMap &copy; CARTO',maxZoom:19,subdomains:"abcd",crossOrigin:"anonymous"});
   baseSat=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{attribution:'Imagery &copy; Esri',maxZoom:19,crossOrigin:"anonymous"});
   satLabels=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,opacity:.9,crossOrigin:"anonymous"});
@@ -793,17 +796,15 @@ function focusItem(id){
     if(!map) return;
     const pts=locsOf(it); if(!pts.length) return;
     const navLoc=startLoc(it)||endLoc(it); showFromMe(navLoc,(navLoc&&navLoc.name)||it.title);
-    const pm = markersById[id] || markersById[id+"-to"] || markersById[id+"-main"] || markersById[id+"-from"];
+    // No auto-popup on item tap — the expanded card below shows everything; popups open only when a pin itself is tapped
     const far = pts.length>1 && pts[0].distanceTo(pts[pts.length-1])>400000; // >400km = a flight: don't zoom out to the world
     if(pts.length>1 && !far){
-      try{ map.fitBounds(L.latLngBounds(pts), {maxZoom:15, paddingTopLeft:[24,100], paddingBottomRight:[24,24]}); }catch(e){}
-      if(pm) setTimeout(()=>pm.openPopup(),400);
+      try{ map.fitBounds(L.latLngBounds(pts), {maxZoom:15, paddingTopLeft:[24,40], paddingBottomRight:[24,24]}); }catch(e){}
     } else {
       const target = pts.length>1 ? pts[pts.length-1] : pts[0];
       const z=Math.max(map.getZoom(),14);
-      const p=map.project(target,z); p.y -= map.getSize().y*0.20; // shift centre north so the marker sits low and the popup fits above
+      const p=map.project(target,z); p.y -= map.getSize().y*0.08; // nudge centre up slightly so the pin sits just below middle
       map.flyTo(map.unproject(p,z), z, {duration:.5});
-      if(pm) setTimeout(()=>pm.openPopup(),560);
     }
   };
   setTimeout(run, isMobile()?180:0);
@@ -1238,10 +1239,9 @@ function showFromMe(loc,label){
   const gq=loc.lat+","+loc.lng;
   const dir=userLoc?`https://www.google.com/maps/dir/?api=1&origin=${userLoc.lat},${userLoc.lng}&destination=${gq}&travelmode=driving`
                    :`https://www.google.com/maps/dir/?api=1&destination=${gq}&travelmode=driving`;
-  let est;
-  if(userLoc){ const km=haversineKm(userLoc,loc); est=`<b>${distLabel(km)}</b> · ~${durText(Math.max(5,Math.round(km/32*60))*60000)} drive`; }
-  else est=`<button style="color:var(--accent-deep);font-weight:600" data-act="useLoc">◎ enable location</button>`;
-  el.innerHTML=`🧭 <span class="fl">${esc(label||"")}</span> <span class="fe">${est}</span> <a href="${dir}" target="_blank" rel="noopener">Directions ↗</a>`;
+  let est="";
+  if(userLoc){ const km=haversineKm(userLoc,loc); est=`<span class="fe"><b>${distLabel(km)}</b> · ~${durText(Math.max(5,Math.round(km/32*60))*60000)}</span> · `; }
+  el.innerHTML=`🧭 ${est}<a href="${dir}" target="_blank" rel="noopener">Directions ↗</a>`;
   el.style.display="flex";
   if(userLoc&&googleReady){ const my=++fromMeReq;
     gDirections({lat:userLoc.lat,lng:userLoc.lng},{lat:loc.lat,lng:loc.lng},new Date()).then(r=>{
@@ -1528,7 +1528,8 @@ function renderSettings(){ const m=state.meta; const ownKey=!!(m.mapsKey||"").tr
       </div>
       <div class="hint">A lock screen when the app opens, shared with Elisa. Soft (client-side) protection — keeps casual eyes out.</div></div>
     <div class="field"><label>Install</label><div class="hint">On iPhone: Safari → Share → <b>Add to Home Screen</b> to launch INDO 2026 full-screen like a real app.</div>
-      <div class="hint" style="margin-top:6px">Build <span class="mono">${esc(APP_BUILD)}</span> — if a fix doesn't show, fully close and reopen the app.</div></div>
+      <div class="hint" style="margin-top:6px">Build <span class="mono">${esc(APP_BUILD)}</span> — if a fix doesn't show, fully close and reopen the app.</div>
+      <div class="hint" style="margin-top:4px">Viewport <span class="mono">${innerWidth}×${innerHeight}</span> of <span class="mono">${screen.width}×${screen.height}</span> · insets <span class="mono">${(()=>{const d=document.createElement("div");d.style.cssText="position:fixed;left:-9999px;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)";document.body.appendChild(d);const c=getComputedStyle(d);const v="t"+(parseFloat(c.paddingTop)||0)+" b"+(parseFloat(c.paddingBottom)||0);d.remove();return v;})()}</span> · ${navigator.standalone?"standalone":"browser"}</div></div>
   </div>`;
   setSyncStatus(syncStatus);
 }
