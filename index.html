@@ -420,6 +420,9 @@
   .ess-b{white-space:pre-wrap; font-size:13.5px; line-height:1.65; color:var(--ink)}
   .ess-add{display:flex; width:100%; text-align:left; border:1.5px dashed var(--line-strong); border-radius:14px; padding:13px 15px; color:var(--muted); font-size:13.5px; margin:4px 0 14px; background:var(--card)}
   .ess-add:hover{border-color:#e0483d; color:var(--ink)}
+  .orline{display:flex; align-items:center; gap:10px; color:var(--faint); font-size:11.5px; text-transform:uppercase; letter-spacing:.07em; margin:2px 0 10px}
+  .orline::before,.orline::after{content:""; flex:1; height:1px; background:var(--line)}
+  .dchip a{color:inherit}
   .datebar.offday .datemain .wx{display:none !important}
   .gotoday:active{transform:scale(.93)}
   @keyframes gtpop{from{opacity:0; transform:scale(.82)} to{opacity:1}}
@@ -577,7 +580,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r23";
+const APP_BUILD = "10 Jun 2026 · r24";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -806,7 +809,7 @@ function openDetail(id){
   const it=state.items.find(x=>x.id===id) || (state.hotspots||[]).find(x=>x.id===id);
   if(!it) return;
   const t=TYPES[it.type]||TYPES.other;
-  const docs=(it.docIds||[]).map(x=>state.docs.find(d=>d.id===x)).filter(Boolean);
+  const _dseen=new Set(); const docs=[...(it.docIds||[]).map(x=>state.docs.find(d=>d.id===x)), ...state.docs.filter(d=>d.itemId===it.id)].filter(d=>d&&!_dseen.has(d.id)&&_dseen.add(d.id));
   const locsHtml=(it.fromLoc||it.toLoc)?(locLineHTML(it,it.fromLoc,"from")+locLineHTML(it,it.toLoc,"to")):locLineHTML(it,it.location,"main");
   $("#detailBody").innerHTML=`
     <div class="dh"><span class="de">${t.emoji}</span><span class="dt">${esc(it.title||t.label)}</span></div>
@@ -1037,7 +1040,7 @@ function tlRow(it,isLast){
   let timeHtml = si?`${fmtTime(si,sTz)}<span class="z">${esc(tzAbbr(sTz))}</span>`:`–`;
   const brief = isLeg ? `${esc(it.fromLoc?.name||"")} → ${esc(it.toLoc?.name||"")}`
     : (it.location&&(it.location.name||it.location.address)) ? esc(it.location.name||it.location.address) : "";
-  const docs=(it.docIds||[]).map(x=>state.docs.find(d=>d.id===x)).filter(Boolean);
+  const _dseen=new Set(); const docs=[...(it.docIds||[]).map(x=>state.docs.find(d=>d.id===x)), ...state.docs.filter(d=>d.itemId===it.id)].filter(d=>d&&!_dseen.has(d.id)&&_dseen.add(d.id));
   const locsFull = isLeg ? (locLineHTML(it,it.fromLoc,"from")+locLineHTML(it,it.toLoc,"to")) : locLineHTML(it,it.location,"main");
   const nb=nearbyHotspots(it);
   const expand = `<div class="tl-expand"${it.id===ui.expandedId?' style="max-height:none"':''}>
@@ -1171,31 +1174,30 @@ function renderItinerary(){
 /* ====================== DOCUMENTS ====================== */
 const DOC_CATS=["Flight","Hotel","Transfer","Insurance","Visa / Passport","Booking","Other"];
 const DOC_ICON={Flight:"✈️",Hotel:"🏨",Transfer:"🚗",Insurance:"🛡️","Visa / Passport":"🛂",Booking:"🎫",Other:"📄"};
+function docChipHTML(d){ return `<span class="chip doc dchip"><a href="${esc(d.url)}" target="_blank" rel="noopener">${d.file?"📎":"🔗"} ${esc(d.title)}</a><button class="hs-rm" style="position:static;width:17px;height:17px;margin-left:4px" data-act="delDoc" data-id="${d.id}">✕</button></span>`; }
 function renderDocuments(){
   let html=`<div class="sec-head"><h2>Documents</h2><div class="sp"></div>
-    <button class="btn ghost sm" data-act="setDrive">${state.meta.driveUrl?"Edit Drive link":"Add Drive link"}</button>
     <button class="btn lime" data-act="addDoc">＋ Add document</button></div><div class="doc-body">`;
-  if(state.meta.driveUrl){
-    html+=`<a class="drive" href="${esc(state.meta.driveUrl)}" target="_blank" rel="noopener"><span class="gic">📁</span><span><div class="t">Open Google Drive folder</div><div class="s">${esc(state.meta.driveUrl.replace(/^https?:\/\//,"").slice(0,52))}…</div></span><span style="margin-left:auto" class="btn ghost sm">Open ↗</span></a>`;
-  } else {
-    html+=`<div class="drive"><span class="gic">📁</span><span><div class="t">No Drive folder linked yet</div><div class="s">Paste your shared Google Drive link so all your booking PDFs live here.</div></span><button class="btn ghost sm" style="margin-left:auto" data-act="setDrive">Add link</button></div>`;
-  }
   const ess=(state.meta.essentials||"").trim();
   if(ess){
     html+=`<div class="esscard"><div class="ess-h">🆘 Essentials <button class="iconbtn" data-act="editEss" title="Edit">✎</button><button class="iconbtn" data-act="copyEss" title="Copy all">⧉</button></div><div class="ess-b">${esc(ess)}</div></div>`;
   } else {
     html+=`<button class="ess-add" data-act="editEss">🆘 Add essentials — insurance policy, embassy, emergency numbers…</button>`;
   }
-  const withFiles=sortedItems().filter(i=>i.files&&i.files.length);
+  const itemDocs={}; state.docs.forEach(d=>{ if(d.itemId) (itemDocs[d.itemId]=itemDocs[d.itemId]||[]).push(d); });
+  const withFiles=sortedItems().filter(i=>(i.files&&i.files.length)||(itemDocs[i.id]&&itemDocs[i.id].length));
+  const general=state.docs.filter(d=>!d.itemId);
   if(withFiles.length){
-    html+=`<div class="sec-sub">📂 Itinerary items</div>`+withFiles.map(it=>{ const t=TYPES[it.type]||TYPES.other;
-      return `<div class="itdoc"><div class="itdoc-t">${t.emoji} ${esc(it.title||t.label)}</div><div class="chiprow">${it.files.map(f=>`<a class="chip doc" href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name)}</a>`).join("")}</div></div>`; }).join("");
-    if(state.docs.length) html+=`<div class="sec-sub">🔗 Linked documents</div>`;
+    html+=`<div class="sec-sub">📂 By itinerary item</div>`+withFiles.map(it=>{ const t=TYPES[it.type]||TYPES.other;
+      const chips=[ ...(it.files||[]).map(f=>`<a class="chip doc" href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name)}</a>`),
+                    ...((itemDocs[it.id]||[]).map(docChipHTML)) ].join("");
+      return `<div class="itdoc"><div class="itdoc-t">${t.emoji} ${esc(it.title||t.label)}</div><div class="chiprow">${chips}</div></div>`; }).join("");
+    if(general.length) html+=`<div class="sec-sub">🗂 General</div>`;
   }
-  if(state.docs.length){
-    html+=`<div class="doc-grid">`+state.docs.map(d=>`<a class="doccard" href="${esc(d.url)}" target="_blank" rel="noopener"><span class="dic">${DOC_ICON[d.cat]||"📄"}</span><span><div class="t">${esc(d.title)}</div><div class="cat">${esc(d.cat||"Other")}${d.note?" · "+esc(d.note):""}</div></span><button class="iconbtn x" title="Delete" data-act="delDoc" data-id="${d.id}" onclick="event.preventDefault()">✕</button></a>`).join("")+`</div>`;
+  if(general.length){
+    html+=`<div class="doc-grid">`+general.map(d=>`<a class="doccard" href="${esc(d.url)}" target="_blank" rel="noopener"><span class="dic">${d.file?"📎":(DOC_ICON[d.cat]||"📄")}</span><span><div class="t">${esc(d.title)}</div><div class="cat">${esc(d.cat||"Other")} · ${d.file?"uploaded":"link"}${d.note?" · "+esc(d.note):""}</div></span><button class="iconbtn x" title="Delete" data-act="delDoc" data-id="${d.id}" onclick="event.preventDefault()">✕</button></a>`).join("")+`</div>`;
   } else if(!withFiles.length){
-    html+=`<div class="empty"><div class="big">📄</div><h3>No documents yet</h3><p>Add links (boarding passes, hotel confirmations, insurance), upload files onto itinerary items — or just link the whole Drive folder above.</p><div class="cta"><button class="btn lime" data-act="addDoc">＋ Add document</button></div></div>`;
+    html+=`<div class="empty"><div class="big">📄</div><h3>No documents yet</h3><p>Upload booking PDFs, tickets and insurance straight into the trip — or link anything by URL. Attach them to itinerary items so they're there when you need them.</p><div class="cta"><button class="btn lime" data-act="addDoc">＋ Add document</button></div></div>`;
   }
   $("#main").innerHTML=html+`</div>`;
 }
@@ -1493,7 +1495,6 @@ function renderSettings(){ const m=state.meta; const ownKey=!!(m.mapsKey||"").tr
       <div class="field"><label>Destination time zone (header clock)</label><select class="inp" data-set="destTz">${zoneOptions(m.destTz)}</select><div class="hint">Bali & Lombok are WITA (UTC+8). Each item can still have its own zone.</div></div>
     </div>
     <div class="field"><label>Time format</label><select class="inp" data-set="clock"><option value="24"${m.clock!=="12"?" selected":""}>24-hour · 20:45</option><option value="12"${m.clock==="12"?" selected":""}>12-hour · 8:45 pm</option></select></div>
-    <div class="field"><label>Google Drive folder link</label><input class="inp" data-set="driveUrl" placeholder="https://drive.google.com/drive/folders/…" value="${esc(m.driveUrl)}"><div class="hint">Shows as a one-tap button on the Documents tab.</div></div>
     <div class="field"><label>Calendar</label><button class="btn ghost" data-act="icsExport" style="justify-content:center">📆 Download trip calendar (.ics)</button><div class="hint">Every flight, transfer and activity lands in your real calendar (with reminders — 3h before flights). Open the downloaded file and iOS/Google Calendar does the rest. Re-download after big changes.</div></div>
     <div class="field"><label>Google Maps API key <span class="keystatus ${keyOn?"on":"off"}">${keyOn?"● live data on":"○ using estimates"}</span></label>
       <input class="inp mono" type="password" data-set="mapsKey" placeholder="${ownKey?'AIza…':'Built-in key active — leave blank'}" value="${esc(m.mapsKey)}">
@@ -1534,7 +1535,6 @@ function itemModal(item){
   draft=item?JSON.parse(JSON.stringify(item)):{id:uid(),type:"activity",title:"",date:"",time:"",tz:state.meta.destTz,location:{},docIds:[],files:[]};
   const isLeg=TYPES[draft.type]?.legtoo;
   const typeBtns=Object.entries(TYPES).map(([k,t])=>`<button type="button" class="typebtn${draft.type===k?" on":""}" data-type="${k}"><span class="e">${t.emoji}</span>${t.label}</button>`).join("");
-  const docChecks=state.docs.length?state.docs.map(d=>`<label><input type="checkbox" data-doc="${d.id}" ${(draft.docIds||[]).includes(d.id)?"checked":""}> ${DOC_ICON[d.cat]||"📄"} ${esc(d.title)}</label>`).join(""):`<span style="color:var(--faint);font-size:13px">No documents yet — add them on the Documents tab.</span>`;
   openModal(`<div class="mh"><h3>${item?"Edit item":"Add to itinerary"}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
     <div class="mb">
       <div class="field"><label>Type</label><div class="typegrid" id="typeGrid">${typeBtns}</div></div>
@@ -1549,7 +1549,6 @@ function itemModal(item){
       ${draft.type==="flight"?`<div class="field"><label>Flight number (optional — enables live status)</label><input class="inp mono" id="f-flightno" value="${esc(draft.flightNo||"")}" placeholder="e.g. QR35"></div>`:""}
       <div class="field"><label>Booking / confirmation ref (optional)</label><input class="inp mono" id="f-conf" value="${esc(draft.conf||"")}" placeholder="e.g. ABC123"></div>
       <div class="field"><label>Notes (optional)</label><textarea class="inp" id="f-notes" placeholder="Anything useful — terminal, room type, what to bring…">${esc(draft.notes||"")}</textarea></div>
-      <div class="field"><label>Attach documents</label><div class="checklist">${docChecks}</div></div>
       <div class="field"><label>Upload files (tickets, confirmations, PDFs…)</label>
         <div class="chiprow" id="iFiles">${(draft.files||[]).map((f,i)=>`<span class="chip">📎 ${esc(f.name)} <button class="hs-rm" style="position:static;width:17px;height:17px;margin-left:3px" data-act="rmFile" data-i="${i}">✕</button></span>`).join("")}</div>
         <label class="btn ghost sm" style="margin-top:8px;display:inline-flex">⬆ Upload file<input type="file" id="iFile" multiple style="display:none"></label>
@@ -1632,23 +1631,55 @@ function collectItemForm(){ if(!$("#f-title")) return;
   draft.title=$("#f-title").value.trim(); draft.date=$("#f-date").value; draft.time=$("#f-time").value; draft.date2=$("#f-date2").value; draft.time2=$("#f-time2").value;
   draft.tz=$("#f-tz").value; draft.tz2=$("#f-tz2").value; draft.conf=$("#f-conf").value.trim(); draft.notes=$("#f-notes").value;
   const fn=$("#f-flightno"); if(fn) draft.flightNo=fn.value.trim().toUpperCase();
-  draft.docIds=[...document.querySelectorAll("[data-doc]")].filter(c=>c.checked).map(c=>c.dataset.doc);
   const grab=prefix=>{ const qEl=$("#"+prefix+"-q"); if(!qEl) return null; const picked=(draft._tmp&&draft._tmp[prefix])||{}; const name=qEl.value.trim(),addr=$("#"+prefix+"-addr").value.trim(); const o={name,address:addr}; if(picked.lat!=null){o.lat=picked.lat;o.lng=picked.lng;if(!o.name)o.name=picked.name;} return (o.name||o.address||o.lat!=null)?o:null; };
   if(TYPES[draft.type]?.legtoo){ draft.fromLoc=grab("from"); draft.toLoc=grab("to"); draft.location=null; } else { draft.location=grab("main"); draft.fromLoc=null; draft.toLoc=null; }
 }
 function saveItem(){ collectItemForm(); if(!draft.title){ toast("Give it a title first"); return; } delete draft._tmp;
   const i=state.items.findIndex(x=>x.id===draft.id); if(i>=0) state.items[i]=draft; else state.items.push(draft);
   save(); syncSet("items/"+draft.id, draft); closeModal(); refreshMap(); renderMain(); toast("Saved",true); }
-function docModal(){ openModal(`<div class="mh"><h3>Add document</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
-  <div class="mb"><div class="field"><label>Title</label><input class="inp" id="d-title" placeholder="e.g. Qatar Airways boarding pass"></div>
-    <div class="field"><label>Link (Google Drive, PDF, booking URL…)</label><input class="inp" id="d-url" placeholder="https://…"></div>
-    <div class="row2"><div class="field"><label>Category</label><select class="inp" id="d-cat">${DOC_CATS.map(c=>`<option>${c}</option>`).join("")}</select></div><div class="field"><label>Note (optional)</label><input class="inp" id="d-note" placeholder="e.g. both passengers"></div></div></div>
-  <div class="mf"><div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn lime" data-act="saveDoc">Add</button></div></div>`); }
-function saveDoc(){ const title=$("#d-title").value.trim(),url=$("#d-url").value.trim(); if(!title||!url){ toast("Title and link required"); return; }
-  const d={id:uid(),title,url:/^https?:/.test(url)?url:"https://"+url,cat:$("#d-cat").value,note:$("#d-note").value.trim()}; state.docs.push(d); save(); syncSet("docs/"+d.id,d); closeModal(); renderMain(); toast("Document added",true); }
-function driveModal(){ openModal(`<div class="mh"><h3>Google Drive folder</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
-  <div class="mb"><div class="field"><label>Shared folder link</label><input class="inp" id="drv" value="${esc(state.meta.driveUrl)}" placeholder="https://drive.google.com/drive/folders/…"><div class="hint">Share it (Anyone with the link) so Elisa can open it too.</div></div></div>
-  <div class="mf"><div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn lime" data-act="saveDrive">Save</button></div></div>`); }
+function docModal(){
+  draft={_dfiles:[]};
+  const itemOpts=sortedItems().map(it=>{ const t=TYPES[it.type]||TYPES.other; return `<option value="${it.id}">${t.emoji} ${esc(it.title||t.label)}</option>`; }).join("");
+  openModal(`<div class="mh"><h3>Add document</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
+  <div class="mb">
+    <div class="field"><label>Upload files (tickets, PDFs, photos…)</label>
+      <div class="chiprow" id="dFiles"></div>
+      <label class="btn ghost sm" style="display:inline-flex">⬆ Choose file(s)<input type="file" id="dFile" multiple style="display:none"></label>
+      <div class="hint" id="dUpStatus">${fstore?"Stored in your shared trip — synced to you both, offline-friendly.":"Uploads need cloud sync."}</div>
+    </div>
+    <div class="orline"><span>or link a URL</span></div>
+    <div class="field"><input class="inp" id="d-url" placeholder="https://… (booking page, airline, anything)"></div>
+    <div class="field"><label>Title ${""}</label><input class="inp" id="d-title" placeholder="e.g. Travel insurance policy — auto-filled from filename"></div>
+    <div class="row2">
+      <div class="field"><label>Category</label><select class="inp" id="d-cat">${DOC_CATS.map(c=>`<option>${c}</option>`).join("")}</select></div>
+      <div class="field"><label>Attach to item (optional)</label><select class="inp" id="d-item"><option value="">— none, general —</option>${itemOpts}</select></div>
+    </div>
+  </div>
+  <div class="mf"><div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn lime" data-act="saveDoc">Add</button></div></div>`);
+  $("#dFile").addEventListener("change",e=>handleDocFiles(e.target.files));
+}
+function renderDocFileChips(){ const row=$("#dFiles"); if(row) row.innerHTML=(draft._dfiles||[]).map((f,i)=>`<span class="chip">📎 ${esc(f.name)} <button class="hs-rm" style="position:static;width:17px;height:17px;margin-left:3px" data-act="rmDocFile" data-i="${i}">✕</button></span>`).join(""); }
+async function handleDocFiles(files){
+  if(!fstore){ toast("File upload needs cloud sync"); return; }
+  const st=$("#dUpStatus"); if(st) st.textContent="Uploading…"; draft._dfiles=draft._dfiles||[];
+  for(const f of files){ try{
+    const r=fstore.ref("trips/"+tripId+"/docs/"+uid()+"_"+f.name.replace(/[^\w.\- ]/g,""));
+    await r.put(f); draft._dfiles.push({name:f.name, url:await r.getDownloadURL(), type:f.type||"", size:f.size||0});
+  }catch(e){ if(st) st.textContent="Upload failed — check connection"; return; } }
+  renderDocFileChips();
+  const ti=$("#d-title"); if(ti&&!ti.value.trim()&&draft._dfiles.length===1) ti.value=draft._dfiles[0].name.replace(/\.[a-z0-9]{2,5}$/i,"");
+  if(st) st.textContent="Done — "+draft._dfiles.length+" file"+(draft._dfiles.length===1?"":"s")+" ready.";
+}
+function saveDoc(){
+  const title=$("#d-title").value.trim(), url=$("#d-url").value.trim(), cat=$("#d-cat").value, itemId=$("#d-item").value||null;
+  const files=draft._dfiles||[];
+  if(!files.length && !url){ toast("Upload a file or paste a link"); return; }
+  const added=[];
+  files.forEach(f=>{ const d={id:uid(), title:(files.length===1&&title)||f.name.replace(/\.[a-z0-9]{2,5}$/i,""), url:f.url, cat, file:{name:f.name,type:f.type,size:f.size}}; if(itemId) d.itemId=itemId; added.push(d); });
+  if(!files.length && url){ const d={id:uid(), title:title||url.replace(/^https?:\/\//,"").split("/")[0], url:/^https?:/.test(url)?url:"https://"+url, cat}; if(itemId) d.itemId=itemId; added.push(d); }
+  added.forEach(d=>{ state.docs.push(d); syncSet("docs/"+d.id,d); });
+  save(); closeModal(); renderMain(); toast(added.length+" document"+(added.length===1?"":"s")+" added",true);
+}
 function exportData(){ const code=btoa(unescape(encodeURIComponent(JSON.stringify(state))));
   openModal(`<div class="mh"><h3>Share / backup</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
   <div class="mb"><div class="field"><label>Share code</label><textarea class="inp mono" id="exp" style="min-height:120px" readonly>${esc(code)}</textarea><div class="hint">Send to Elisa → she opens the app → Settings → Import → paste.</div></div>
@@ -1718,10 +1749,11 @@ document.addEventListener("click",e=>{
     case "addExample": loadExample(); break;
     case "addDoc": docModal(); break;
     case "saveDoc": saveDoc(); break;
-    case "delDoc": if(confirm("Remove this document?")){ state.docs=state.docs.filter(d=>d.id!==id); state.items.forEach(it=>it.docIds=(it.docIds||[]).filter(x=>x!==id)); save(); syncRemove("docs/"+id); pushItems(); renderMain(); } break;
+    case "delDoc": if(confirm("Remove this document?")){ const dd=state.docs.find(d=>d.id===id); state.docs=state.docs.filter(d=>d.id!==id); state.items.forEach(it=>it.docIds=(it.docIds||[]).filter(x=>x!==id));
+      if(dd&&dd.file&&fstore&&/firebasestorage/.test(dd.url||"")){ try{ fstore.refFromURL(dd.url).delete().catch(()=>{}); }catch(e){} }
+      save(); syncRemove("docs/"+id); pushItems(); renderMain(); } break;
+    case "rmDocFile": { const i=+a.dataset.i; if(draft&&draft._dfiles){ const f=draft._dfiles.splice(i,1)[0]; if(f&&fstore&&/firebasestorage/.test(f.url||"")){ try{ fstore.refFromURL(f.url).delete().catch(()=>{}); }catch(e){} } renderDocFileChips(); } break; }
     case "invite": copy(inviteLink()); toast("Invite link copied — send it to Elisa",true); break;
-    case "setDrive": driveModal(); break;
-    case "saveDrive": state.meta.driveUrl=$("#drv").value.trim(); save(); syncSet("meta",state.meta); closeModal(); renderMain(); toast("Drive link saved",true); break;
     case "export": exportData(); break;
     case "copyExp": copy($("#exp").value); break;
     case "downloadExp": { const blob=new Blob([$("#exp").value],{type:"text/plain"}); const u=URL.createObjectURL(blob); const x=document.createElement("a"); x.href=u; x.download="indo-2026-backup.txt"; x.click(); URL.revokeObjectURL(u); break; }
