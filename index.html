@@ -588,7 +588,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r29";
+const APP_BUILD = "10 Jun 2026 · r30";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -929,18 +929,22 @@ function syncHeadH(){ const h=document.querySelector("header.top"); if(h) docume
    Measure the true visible height and slide the chrome down by the difference.
    Self-healing: when iOS fixes it (Safari 26.1), the gap measures 0. */
 function syncVVGap(){ try{
-  let gap=0;
+  // Measure the standalone viewport deficit (iOS ≤18 bug: layout+visual viewports are
+  // reported short by the status-bar height, top-anchored; band at the bottom).
+  let m=0;
   const vv=window.visualViewport;
-  if(vv) gap=Math.max(gap, Math.round(vv.height + vv.offsetTop - innerHeight));
-  // iOS 26 standalone: layout AND visual viewports are both reported short (by the
-  // status-bar height) and top-anchored, so the deficit only shows vs screen.height.
-  // Only trust that comparison in standalone portrait (browser toolbars are legit).
-  if(navigator.standalone && innerHeight>innerWidth) gap=Math.max(gap, Math.min(120, screen.height - innerHeight));
-  if(gap<6) gap=0;
+  if(vv) m=Math.max(m, Math.round(vv.height + vv.offsetTop - innerHeight));
+  if(navigator.standalone && innerHeight>innerWidth) m=Math.max(m, Math.min(120, screen.height - innerHeight));
+  if(m<6) m=0;
   const de=document.documentElement;
-  de.style.setProperty("--vv-gap", gap+"px");
-  // bar slides into the real bottom zone → it needs home-indicator clearance again
-  if(gap>4) de.style.setProperty("--bar-pad","24px"); else de.style.removeProperty("--bar-pad");
+  de.style.setProperty("--vv-meas", m+"px"); // diagnostics only (Settings readout)
+  // DO NOT offset the chrome by it — verified on-device that iOS clips ALL painting
+  // below its short viewport (the slid bar rendered cut off). The dead strip cannot
+  // be drawn into at rest; it only becomes visible when iOS slides the window on scroll.
+  de.style.setProperty("--vv-gap","0px");
+  // The home indicator sits inside the dead strip, NOT over the bar — so in the bugged
+  // state the bar needs no indicator clearance; trim it to minimum.
+  if(m>4 && navigator.standalone) de.style.setProperty("--bar-pad","6px"); else de.style.removeProperty("--bar-pad");
 }catch(e){} }
 window.visualViewport?.addEventListener("resize", syncVVGap);
 window.visualViewport?.addEventListener("scroll", syncVVGap);
@@ -1550,7 +1554,7 @@ function renderSettings(){ const m=state.meta; const ownKey=!!(m.mapsKey||"").tr
       <div class="hint">A lock screen when the app opens, shared with Elisa. Soft (client-side) protection — keeps casual eyes out.</div></div>
     <div class="field"><label>Install</label><div class="hint">On iPhone: Safari → Share → <b>Add to Home Screen</b> to launch INDO 2026 full-screen like a real app.</div>
       <div class="hint" style="margin-top:6px">Build <span class="mono">${esc(APP_BUILD)}</span> — if a fix doesn't show, fully close and reopen the app.</div>
-      <div class="hint" style="margin-top:4px">Viewport <span class="mono">${innerWidth}×${innerHeight}</span> of <span class="mono">${screen.width}×${screen.height}</span> · vv <span class="mono">${window.visualViewport?Math.round(visualViewport.height):"?"}</span> · gap <span class="mono">${getComputedStyle(document.documentElement).getPropertyValue("--vv-gap")||"0px"}</span> · insets <span class="mono">${(()=>{const d=document.createElement("div");d.style.cssText="position:fixed;left:-9999px;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)";document.body.appendChild(d);const c=getComputedStyle(d);const v="t"+(parseFloat(c.paddingTop)||0)+" b"+(parseFloat(c.paddingBottom)||0);d.remove();return v;})()}</span> · ${navigator.standalone?"standalone":"browser"} · ${(navigator.userAgent.match(/OS (\d+)[._](\d+)/)||[]).slice(1).join(".")||"?"}</div></div>
+      <div class="hint" style="margin-top:4px">Viewport <span class="mono">${innerWidth}×${innerHeight}</span> of <span class="mono">${screen.width}×${screen.height}</span> · vv <span class="mono">${window.visualViewport?Math.round(visualViewport.height):"?"}</span> · gap <span class="mono">${getComputedStyle(document.documentElement).getPropertyValue("--vv-meas")||"0px"}</span> ·insets <span class="mono">${(()=>{const d=document.createElement("div");d.style.cssText="position:fixed;left:-9999px;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)";document.body.appendChild(d);const c=getComputedStyle(d);const v="t"+(parseFloat(c.paddingTop)||0)+" b"+(parseFloat(c.paddingBottom)||0);d.remove();return v;})()}</span> · ${navigator.standalone?"standalone":"browser"} · ${(navigator.userAgent.match(/OS (\d+)[._](\d+)/)||[]).slice(1).join(".")||"?"}</div></div>
   </div>`;
   setSyncStatus(syncStatus);
 }
