@@ -615,7 +615,11 @@ function onRemote(snap){
   state.hotspots = v.hotspots?Object.values(v.hotspots):[];
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
   if($("#tripSub") && document.activeElement!==$("#tripSub") && state.meta.sub) $("#tripSub").value=state.meta.sub;
-  renderClocks(); renderMain(); refreshMap(); checkLock();
+  renderClocks();
+  // Don't re-render a view the user is actively typing in (it would replace the focused field).
+  const ae=document.activeElement, editing = ae && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName);
+  if(ui.view!=="settings" && !editing) renderMain();
+  refreshMap(); checkLock();
 }
 function pushAll(){ if(!tripRef) return; const items={},docs={},hs={};
   state.items.forEach(i=>items[i.id]=i); state.docs.forEach(d=>docs[d.id]=d); (state.hotspots||[]).forEach(h=>hs[h.id]=h);
@@ -1440,8 +1444,7 @@ document.addEventListener("click",e=>{
   }
 });
 document.addEventListener("input",e=>{ const s=e.target.closest("[data-set]"); if(!s) return; state.meta[s.dataset.set]=s.value.trim(); save(); pushMeta();
-  if(s.dataset.set==="destTz"||s.dataset.set==="homeTz") renderClocks();
-  if(s.dataset.set==="clock"){ renderClocks(); renderMain(); } });
+  if(s.dataset.set==="destTz"||s.dataset.set==="homeTz"||s.dataset.set==="clock") renderClocks(); });
 document.addEventListener("change",e=>{ const s=e.target.closest("[data-set]"); if(s&&s.dataset.set==="mapsKey"){ googleReady=false; googleLoading=false; legCache.clear(); loadGoogle(); renderSettings(); } });
 document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
 $("#tripSub").addEventListener("input",e=>{ state.meta.sub=e.target.value; save(); pushMeta(); });
