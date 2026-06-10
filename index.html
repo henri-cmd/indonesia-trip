@@ -475,7 +475,6 @@
   .segtoggle{display:inline-flex; background:var(--bg); border:1px solid var(--line); border-radius:11px; padding:3px; gap:2px}
   .segtoggle button{padding:6px 17px; border-radius:8px; font-size:13px; font-weight:600; color:var(--muted); transition:color .15s, background .15s, box-shadow .15s}
   .segtoggle button.on{background:var(--card); color:var(--ink); box-shadow:0 1px 4px rgba(0,0,0,.12)}
-  @media(max-width:859px){ body[data-view="today"][data-itin="all"] .mapwrap{display:none} }
 </style>
 </head>
 <body data-view="today" data-itin="day">
@@ -500,9 +499,9 @@
       <button data-view="today" class="active">Itinerary</button>
       <button data-view="hotspots">Hotspots</button>
       <button data-view="documents">Docs</button>
+      <button data-view="settings">Settings</button>
     </nav>
     <button class="gear maptoggle" id="mapToggle" title="Show / hide map">🗺</button>
-    <button class="gear" data-view="settings" title="Settings">⚙︎</button>
   </div>
 </header>
 
@@ -526,6 +525,7 @@
   <button data-view="hotspots"><span class="ti">📍</span><span>Hotspots</span></button>
   <button class="fab" id="fab" aria-label="Create">＋</button>
   <button data-view="documents"><span class="ti">📁</span><span>Docs</span></button>
+  <button data-view="settings"><span class="ti">⚙︎</span><span>Settings</span></button>
 </nav>
 
 <div class="detail" id="detail"><div class="detail-inner">
@@ -557,7 +557,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r13";
+const APP_BUILD = "10 Jun 2026 · r14";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -758,7 +758,7 @@ function focusItem(id){
   const it = state.items.find(x=>x.id===id) || (state.hotspots||[]).find(x=>x.id===id);
   ui.selId=id;
   if(isMobile() && ui.view!=="today"){ setView("today"); }
-  if(!it || document.body.classList.contains("map-collapsed") || (isMobile() && ui.itinMode==="all")) return; // map hidden — nothing to pan
+  if(!it || document.body.classList.contains("map-collapsed")) return; // map hidden — nothing to pan
   const run=()=>{
     if(!map) return;
     const pts=locsOf(it); if(!pts.length) return;
@@ -1132,9 +1132,7 @@ function legHTML(a,b){ const lg=legInfo(a,b); if(!lg) return "";
 }
 function renderItinerary(){
   const items=sortedItems();
-  let html=`<div class="sec-head itinhead">${itinToggleHTML()}<div class="sp"></div>
-    ${items.length?`<button class="btn ghost sm" data-act="addExample">＋ Example</button>`:""}
-    <button class="btn lime" data-act="add">＋ Add item</button></div><div class="it-body">`;
+  let html=`<div class="itinbar">${itinToggleHTML()}</div><div class="it-body">`;
   if(!items.length){
     html+=`<div class="empty"><div class="big">🌴</div><h3>Plan your Indonesia trip</h3><p>Add flights, hotels, transfers and activities.<br>Each shows on the map with copyable addresses, local times and live travel times.</p>
       <div class="cta"><button class="btn lime" data-act="add">＋ Add first item</button><button class="btn ghost" data-act="addExample">Load a Bali example</button></div></div>`;
