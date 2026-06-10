@@ -31,6 +31,11 @@
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
+  /* iOS standalone (≤18): on an UNSCROLLABLE document iOS parks its short viewport at the
+     top of the screen (dead strip at the bottom); on a scrollable one it bottom-anchors and
+     the tab bar sits flush (verified on-device — Settings looked right, Today didn't).
+     So in standalone, force every view to overflow by 1px so iOS always bottom-anchors. */
+  html.standalone body{min-height:calc(100vh + 1px)}
   body{
     font-family:'DM Sans',system-ui,-apple-system,sans-serif; color:var(--ink); background:var(--bg);
     -webkit-font-smoothing:antialiased; line-height:1.45; font-size:15px;
@@ -588,7 +593,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r30";
+const APP_BUILD = "10 Jun 2026 · r31";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -942,9 +947,9 @@ function syncVVGap(){ try{
   // below its short viewport (the slid bar rendered cut off). The dead strip cannot
   // be drawn into at rest; it only becomes visible when iOS slides the window on scroll.
   de.style.setProperty("--vv-gap","0px");
-  // The home indicator sits inside the dead strip, NOT over the bar — so in the bugged
-  // state the bar needs no indicator clearance; trim it to minimum.
-  if(m>4 && navigator.standalone) de.style.setProperty("--bar-pad","6px"); else de.style.removeProperty("--bar-pad");
+  // With the 1px-overflow rule (html.standalone body) iOS bottom-anchors every view,
+  // so the home indicator sits over the bar — keep the standard --bar-pad clearance.
+  de.style.removeProperty("--bar-pad");
 }catch(e){} }
 window.visualViewport?.addEventListener("resize", syncVVGap);
 window.visualViewport?.addEventListener("scroll", syncVVGap);
@@ -1819,7 +1824,7 @@ function buildSplash(){ $("#splashWm").innerHTML=[..."INDO 2026"].map((ch,i)=>`<
 function hideSplash(){ const s=$("#splash"); if(s){ s.classList.add("done"); setTimeout(()=>s&&s.remove&&s.remove(),600); } }
 
 /* ---- boot ---- */
-function afterLoad(){ document.body.dataset.itin=ui.itinMode; if(state.meta.sub) $("#tripSub").value=state.meta.sub; renderClocks(); renderMain(); refreshMap(); loadGoogle(); syncHeadH(); setTimeout(moveTabInd,80); }
+function afterLoad(){ if(navigator.standalone) document.documentElement.classList.add("standalone"); document.body.dataset.itin=ui.itinMode; if(state.meta.sub) $("#tripSub").value=state.meta.sub; renderClocks(); renderMain(); refreshMap(); loadGoogle(); syncHeadH(); setTimeout(moveTabInd,80); }
 buildSplash();
 if(localStorage.getItem("indoTrip.mapCollapsed")) document.body.classList.add("map-collapsed");
 initMap();
