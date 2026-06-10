@@ -324,14 +324,19 @@
     .app{grid-template-columns:1fr; display:block; padding:0; gap:0; max-width:none}
     #main{border:none; border-radius:0; box-shadow:none; min-height:70vh; padding-bottom:calc(var(--bar-h) + var(--bar-pad) + 14px)}
     .mapwrap{display:none}
-    /* merged Today = fixed flex column: map pinned on top, list scrolls below */
-    /* NOTE: --head-h is the MEASURED header height and already includes env(safe-area-inset-top)
+    /* ===== Map-first shell: full-bleed map with a draggable bottom sheet (Itinerary + Hotspots) =====
+       NOTE: --head-h is the MEASURED header height and already includes env(safe-area-inset-top)
        (header.top pads itself) — do NOT add the inset again here (it doubled the gap in the installed PWA) */
-    body[data-view="today"] .app{position:fixed; top:var(--head-h); bottom:calc(var(--bar-h) + var(--bar-pad) - var(--vv-gap,0px)); left:0; right:0; display:flex; flex-direction:column; align-items:stretch; padding:0}
-    body[data-view="today"] .mapwrap{display:block; order:-1; flex:0 0 40%; min-height:0; overflow:hidden; position:relative; top:0; border:none; border-radius:0; box-shadow:none; transition:flex-basis .28s var(--ease)}
-    body.map-collapsed[data-view="today"] .mapwrap{flex-basis:0; min-height:0; border:none}
-    body[data-view="today"] #main{flex:1 1 0; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 0 16px; touch-action:pan-y}
+    body[data-view="today"] .app, body[data-view="hotspots"] .app{position:fixed; top:var(--head-h); bottom:calc(var(--bar-h) + var(--bar-pad) - var(--vv-gap,0px)); left:0; right:0; display:block; padding:0; --sheet-top:46%}
+    body[data-view="today"] .mapwrap, body[data-view="hotspots"] .mapwrap{display:block; position:absolute; inset:0; overflow:hidden; border:none; border-radius:0; box-shadow:none}
+    body[data-view="today"] #main, body[data-view="hotspots"] #main{position:absolute; left:0; right:0; bottom:0; top:var(--sheet-top); min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 0 16px; touch-action:pan-y; background:var(--card); border-radius:18px 18px 0 0; box-shadow:0 -10px 34px rgba(20,22,15,.16); z-index:3}
+    .app.sheet-anim #main{transition:top .34s cubic-bezier(.3,1.02,.35,1)}
     body[data-view="today"] .pager{min-height:100%}
+    .sheet-grip{position:sticky; top:0; z-index:7; display:none; justify-content:center; padding:8px 0 3px; background:var(--card); touch-action:none}
+    .sheet-grip::before{content:""; width:40px; height:5px; border-radius:3px; background:var(--line-strong)}
+    body[data-view="today"] .sheet-grip, body[data-view="hotspots"] .sheet-grip{display:flex}
+    body[data-view="today"] .todayhead{top:15px}
+    body[data-view="hotspots"] .sec-head, body[data-view="today"] .itinbar{position:sticky; top:15px; z-index:6; background:var(--card)}
     /* #map absolutely fills .mapwrap — it must never contribute to layout height,
        or the %-height feedback loop (map → mapwrap min-content → map) can explode */
     #map{position:absolute; inset:0; height:auto; min-height:0; border-radius:0}
@@ -389,24 +394,23 @@
   .lock-err{color:#ff8a7d; font-size:13px; min-height:16px}
 
   /* map collapse toggle (mobile, Today only) */
-  .maptoggle{display:none}
   @media(max-width:859px){
-    body[data-view="today"] .maptoggle{display:flex}
-    body.map-collapsed .maptoggle{background:var(--accent); color:var(--ink); border-color:var(--accent)}
     .top-in{gap:8px}
     .gear{width:34px; height:34px; font-size:16px}
     .clock{padding:3px 8px; min-width:0}
     .clock .t{font-size:13px}
   }
 
-  /* merged-Today map controls: compact floating buttons, no big legend bar */
+  /* sheet-shell map controls: compact floating buttons that ride just above the sheet's top edge */
   @media(max-width:859px){
-    body[data-view="today"] .legend{display:none}
-    body[data-view="today"] .map-foot{position:absolute; top:auto; bottom:7px; left:9px; right:9px; width:auto; background:transparent; border:none; backdrop-filter:none; padding:0; gap:7px; flex-direction:row; flex-wrap:nowrap; align-items:center}
-    body[data-view="today"] .map-foot .btn{margin:0; flex:none; display:inline-flex; align-items:center; gap:5px; justify-content:center; padding:6px 11px; font-size:12px; border-radius:20px; background:rgba(255,255,255,.93); backdrop-filter:blur(8px); box-shadow:0 2px 8px rgba(0,0,0,.18); border-color:transparent; white-space:nowrap}
-    body[data-view="today"] .map-foot #meBtn, body[data-view="today"] .map-foot #satBtn{width:34px; height:34px; padding:0; border-radius:50%; font-size:14px}
-    body[data-view="today"] .map-foot #meBtn .mlb, body[data-view="today"] .map-foot #satBtn .mlb{display:none}
-    body[data-view="today"] .map-foot #fitBtn{margin-left:auto}
+    body[data-view="today"] .legend, body[data-view="hotspots"] .legend{display:none}
+    body[data-view="today"] .map-foot, body[data-view="hotspots"] .map-foot{position:absolute; top:auto; bottom:calc(100% - var(--sheet-top,46%) + 9px); left:9px; right:9px; width:auto; background:transparent; border:none; backdrop-filter:none; padding:0; gap:7px; flex-direction:row; flex-wrap:nowrap; align-items:center; z-index:2}
+    .app.sheet-anim .map-foot, .app.sheet-anim .fromme{transition:bottom .34s cubic-bezier(.3,1.02,.35,1)}
+    body[data-view="today"] .map-foot .btn, body[data-view="hotspots"] .map-foot .btn{margin:0; flex:none; display:inline-flex; align-items:center; gap:5px; justify-content:center; padding:6px 11px; font-size:12px; border-radius:20px; background:rgba(255,255,255,.93); backdrop-filter:blur(8px); box-shadow:0 2px 8px rgba(0,0,0,.18); border-color:transparent; white-space:nowrap}
+    body[data-view="today"] .map-foot #meBtn, body[data-view="today"] .map-foot #satBtn, body[data-view="hotspots"] .map-foot #meBtn, body[data-view="hotspots"] .map-foot #satBtn{width:34px; height:34px; padding:0; border-radius:50%; font-size:14px}
+    body[data-view="today"] .map-foot .mlb, body[data-view="hotspots"] .map-foot .mlb{display:none}
+    body[data-view="today"] .map-foot #fitBtn, body[data-view="hotspots"] .map-foot #fitBtn{margin-left:auto; width:34px; height:34px; padding:0; border-radius:50%; font-size:14px}
+    body[data-view="today"] .fromme, body[data-view="hotspots"] .fromme{bottom:calc(100% - var(--sheet-top,46%) + 52px)}
   }
   /* map attribution: tucked top-right, tiny and quiet (moved off the bottom where it hid the from-you bar) */
   .leaflet-control-attribution{font-size:9px !important; line-height:1.5; background:rgba(255,255,255,.72) !important; color:#8a8d7f; padding:1px 7px; border-radius:0 0 0 9px; margin:0 !important}
@@ -537,7 +541,6 @@
       <button data-view="documents">Docs</button>
       <button data-view="settings">Settings</button>
     </nav>
-    <button class="gear maptoggle" id="mapToggle" title="Show / hide map">🗺</button>
   </div>
 </header>
 
@@ -593,7 +596,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r31";
+const APP_BUILD = "11 Jun 2026 · r32";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -786,7 +789,7 @@ function refreshMap(){
   });
   if(linePts.length>1) L.polyline(linePts,{color:"#14160f",weight:1.5,opacity:.22,dashArray:"4 6"}).addTo(lineLayer);
   const fitPts = (focusDayKey&&emphPts.length)?emphPts:allPts;
-  if(fitPts.length && map.getSize().x>0){ try{ map.fitBounds(L.latLngBounds(fitPts).pad(.25),{maxZoom:14}); }catch(e){} }
+  if(fitPts.length && map.getSize().x>0){ try{ map.fitBounds(L.latLngBounds(fitPts).pad(.25),{maxZoom:14, paddingTopLeft:[16,14], paddingBottomRight:[16, sheetCover()+12]}); }catch(e){} }
   const used=[...new Set(state.items.map(i=>i.type))];
   $("#legend").innerHTML=used.map(ty=>{const t=TYPES[ty]||TYPES.other;return `<span><i style="background:${TYPE_HEX[ty]||'#0e9aa0'}"></i>${t.label}</span>`;}).join("")||'<span style="color:var(--faint)">Add a stop to see it on the map</span>';
 }
@@ -796,7 +799,8 @@ function focusItem(id){
   const it = state.items.find(x=>x.id===id) || (state.hotspots||[]).find(x=>x.id===id);
   ui.selId=id;
   if(isMobile() && ui.view!=="today"){ setView("today"); }
-  if(!it || document.body.classList.contains("map-collapsed")) return; // map hidden — nothing to pan
+  if(!it) return;
+  if(isMobile() && sheetViews() && sheet.state==="full") setSheet("half",true); // bring the map into view
   const run=()=>{
     if(!map) return;
     const pts=locsOf(it); if(!pts.length) return;
@@ -804,11 +808,11 @@ function focusItem(id){
     // No auto-popup on item tap — the expanded card below shows everything; popups open only when a pin itself is tapped
     const far = pts.length>1 && pts[0].distanceTo(pts[pts.length-1])>400000; // >400km = a flight: don't zoom out to the world
     if(pts.length>1 && !far){
-      try{ map.fitBounds(L.latLngBounds(pts), {maxZoom:15, paddingTopLeft:[24,40], paddingBottomRight:[24,24]}); }catch(e){}
+      try{ map.fitBounds(L.latLngBounds(pts), {maxZoom:15, paddingTopLeft:[24,40], paddingBottomRight:[24, sheetCover()+24]}); }catch(e){}
     } else {
       const target = pts.length>1 ? pts[pts.length-1] : pts[0];
       const z=Math.max(map.getZoom(),14);
-      const p=map.project(target,z); p.y -= map.getSize().y*0.08; // nudge centre up slightly so the pin sits just below middle
+      const p=map.project(target,z); p.y += sheetCover()/2 - map.getSize().y*0.06; // centre the pin in the strip visible above the sheet
       map.flyTo(map.unproject(p,z), z, {duration:.5});
     }
   };
@@ -929,6 +933,63 @@ function renderClocks(){ const now=new Date(); const home=state.meta.homeTz,dest
     `<div class="clock dest"><div class="lbl">🌴 ${esc(tzAbbr(dest))}</div><div class="t mono">${fmtTime(now,dest)}</div><div class="sub2">${esc(relOffset(dest,home))}</div></div>`;
 }
 function syncHeadH(){ const h=document.querySelector("header.top"); if(h) document.documentElement.style.setProperty("--head-h", Math.round(h.getBoundingClientRect().height)+"px"); }
+/* ===== Bottom sheet (mobile Itinerary + Hotspots): map behind, content in a draggable sheet ===== */
+const SHEET_KEY="indoTrip.sheet";
+let sheet={ state: (["peek","half","full"].includes(localStorage.getItem(SHEET_KEY))?localStorage.getItem(SHEET_KEY):"half") };
+function sheetViews(){ return ui.view==="today"||ui.view==="hotspots"; }
+function sheetAppEl(){ return document.querySelector(".app"); }
+function sheetSnapPx(name){ const a=sheetAppEl(); const H=a?a.clientHeight:600;
+  if(name==="full") return 0;
+  if(name==="peek") return Math.max(0, H-122);
+  return Math.round(H*0.46); }
+function sheetCurTop(){ const a=sheetAppEl(); const v=a&&a.style.getPropertyValue("--sheet-top"); return v?parseFloat(v):sheetSnapPx(sheet.state); }
+function applySheetTop(px,animate){ const a=sheetAppEl(); if(!a) return; a.classList.toggle("sheet-anim",!!animate); a.style.setProperty("--sheet-top", Math.round(px)+"px"); }
+function flyVisible(ll,z){ if(!map) return; z=Math.max(map.getZoom(), z||14); const pt=map.project(L.latLng(ll), z); pt.y += sheetCover()/2 - map.getSize().y*0.06; map.flyTo(map.unproject(pt,z), z, {duration:.5}); }
+function sheetCover(){ if(!isMobile()||!sheetViews()) return 0; const a=sheetAppEl(); const H=a?a.clientHeight:0; return Math.max(0, H - sheetCurTop()); }
+function setSheet(name,animate=true){
+  if(!isMobile()||!sheetViews()) return;
+  sheet.state=name; try{ localStorage.setItem(SHEET_KEY,name); }catch(e){}
+  applySheetTop(sheetSnapPx(name),animate);
+  const m=$("#main"); if(m) m.style.touchAction = name==="full" ? "pan-y" : "none";
+}
+function bindSheetGestures(){
+  const m=$("#main"); if(!m||m._sheet) return; m._sheet=true;
+  let sx=0, sy=0, startTop=0, mode=null, dragging=false, lastY=0, lastT=0, vel=0;
+  m.addEventListener("touchstart",e=>{
+    mode=null; dragging=false;
+    if(!isMobile()||!sheetViews()||e.touches.length!==1) return;
+    const t=e.target;
+    sx=e.touches[0].clientX; sy=e.touches[0].clientY; lastY=sy; lastT=Date.now(); vel=0;
+    const onGrip=!!t.closest(".sheet-grip,.datebar,.itinbar,.sec-head");
+    if(!onGrip && t.closest("input,select,textarea,button,a,label")) return;
+    mode = onGrip ? "grip" : (sheet.state==="full" ? "pull" : "content");
+    startTop = sheetCurTop();
+  },{passive:true});
+  m.addEventListener("touchmove",e=>{
+    if(!mode) return;
+    const x=e.touches[0].clientX, y=e.touches[0].clientY;
+    const dx=x-sx, dy=y-sy;
+    const now=Date.now(); vel=(y-lastY)/Math.max(1,now-lastT); lastY=y; lastT=now;
+    if(!dragging){
+      if(window._pagerX){ mode=null; return; }                  // day-swipe owns this touch
+      if(Math.abs(dy)<10 || Math.abs(dy)<=Math.abs(dx)*1.2) return; // not a clear vertical yet
+      if(mode==="pull" && !(m.scrollTop<=0 && dy>0)){ mode=null; return; } // full + scrolled → native scroll
+      dragging=true;
+    }
+    e.preventDefault();
+    const a=sheetAppEl(); const H=a?a.clientHeight:600;
+    applySheetTop(Math.max(0, Math.min(H-86, startTop+dy)), false);
+  },{passive:false});
+  m.addEventListener("touchend",()=>{
+    if(!dragging){ mode=null; return; }
+    mode=null; dragging=false;
+    const proj=sheetCurTop()+vel*220;                            // velocity bias
+    const snaps=["full","half","peek"].map(n=>({n,px:sheetSnapPx(n)}));
+    let best=snaps[0]; for(const s of snaps) if(Math.abs(s.px-proj)<Math.abs(best.px-proj)) best=s;
+    setSheet(best.n,true);
+  },{passive:true});
+}
+
 /* iOS 26 standalone bug: the layout viewport reserves phantom space for Safari's
    (hidden) toolbar, so fixed bottom elements float above the real screen bottom.
    Measure the true visible height and slide the chrome down by the difference.
@@ -973,8 +1034,10 @@ function setView(v){
   if(v==="hotspots" && geoState==="off") startGeo();
   renderMain();
   const mc=$("#main"); if(mc){ mc.style.animation="none"; void mc.offsetWidth; mc.style.animation="viewfade .24s var(--ease)"; }
+  if(isMobile() && sheetViews()) setSheet(sheet.state,false);
+  else if(mc) mc.style.touchAction="";
   moveTabInd(); syncHeadH();
-  if(map) setTimeout(()=>{ syncHeadH(); map.invalidateSize(); if(v==="today"||!isMobile()) refreshMap(); },70);
+  if(map) setTimeout(()=>{ syncHeadH(); map.invalidateSize(); if(v==="today"||v==="hotspots"||!isMobile()) refreshMap(); },70);
 }
 function renderMain(){
   if(ui.view==="today"){ if(ui.itinMode==="all") renderItinerary(); else renderToday(); }
@@ -1024,6 +1087,7 @@ function renderToday(){
       <span class="dw">${esc(fmtWeekday(d.instant,d.tz))}</span><span class="dd">${esc(fmtDayNum(d.instant,d.tz))}</span><span class="tdot"></span></button>`).join("");
   const pages=days.map((d,i)=>dayPage(d,i,days.length,todayKey)).join("");
   $("#main").innerHTML=`
+    <div class="sheet-grip"></div>
     <div class="todayhead">
       <div class="datebar" id="datebar">
         <button class="datemain" data-act="togglePills">
@@ -1124,17 +1188,16 @@ function setupPager(days){
   place(ui.dayIdx,false); sync(ui.dayIdx);
   refreshWeather(days);
   if(getMapsKey() && !googleReady) loadGoogle();
-  // Gestures attached to the PAGER (a Today-only element, recreated each render) — NOT #main —
-  // so other views' inputs (e.g. Settings dropdowns) are never affected by these listeners.
-  // Horizontal = finger-following day change; pull-down at the top = bring the map back.
+  // Gestures attached to the PAGER (a Today-only element, recreated each render).
+  // Horizontal = finger-following day change. Vertical belongs to the bottom sheet
+  // (bindSheetGestures on #main) — we publish window._pagerX so the sheet yields to x-swipes.
   let sx=0,sy=0,dir=null,onG=false;
-  pager.addEventListener("touchstart",e=>{ if(e.touches.length!==1||e.target.closest(".daystrip,input,select,textarea,button,a,label")){onG=false;return;} sx=e.touches[0].clientX; sy=e.touches[0].clientY; dir=null; onG=true; },{passive:true});
+  pager.addEventListener("touchstart",e=>{ window._pagerX=false; if(e.touches.length!==1||e.target.closest(".daystrip,input,select,textarea,button,a,label")){onG=false;return;} sx=e.touches[0].clientX; sy=e.touches[0].clientY; dir=null; onG=true; },{passive:true});
   pager.addEventListener("touchmove",e=>{ if(!onG)return; const dx=e.touches[0].clientX-sx, dy=e.touches[0].clientY-sy;
-    if(dir===null && (Math.abs(dx)>10||Math.abs(dy)>10)) dir = Math.abs(dx)>Math.abs(dy)*1.25 ? "x":"y";
+    if(dir===null && (Math.abs(dx)>10||Math.abs(dy)>10)){ dir = Math.abs(dx)>Math.abs(dy)*1.25 ? "x":"y"; if(dir==="x") window._pagerX=true; }
     if(dir==="x"){ const n=days.length; let d=dx; if((ui.dayIdx===0&&d>0)||(ui.dayIdx===n-1&&d<0)) d*=0.3; track.style.transition="none"; track.style.transform="translateX(calc("+(-ui.dayIdx*100)+"% + "+d+"px))"; }
-    else if(dir==="y" && dy>70 && (($("#main")?.scrollTop||0)<=0) && document.body.classList.contains("map-collapsed")){ onG=false; setMapCollapsed(false); }
   },{passive:true});
-  pager.addEventListener("touchend",e=>{ if(!onG)return; onG=false; if(dir!=="x")return; const dx=e.changedTouches[0].clientX-sx;
+  pager.addEventListener("touchend",e=>{ const wasX=dir==="x"; setTimeout(()=>{ window._pagerX=false; },0); if(!onG)return; onG=false; if(!wasX)return; const dx=e.changedTouches[0].clientX-sx;
     if(dx<-w()*0.18 && ui.dayIdx<days.length-1) setTo(ui.dayIdx+1,true);
     else if(dx>w()*0.18 && ui.dayIdx>0) setTo(ui.dayIdx-1,true);
     else setTo(ui.dayIdx,true); },{passive:true});
@@ -1192,7 +1255,7 @@ function legHTML(a,b){ const lg=legInfo(a,b); if(!lg) return "";
 function renderItinerary(){
   const days=tripDays();
   const todayKey=dayKey(new Date(),state.meta.destTz);
-  let html=`<div class="itinbar">${itinToggleHTML()}</div><div class="it-body alltl">`;
+  let html=`<div class="sheet-grip"></div><div class="itinbar">${itinToggleHTML()}</div><div class="it-body alltl">`;
   if(!days.length){
     html+=`<div class="empty"><div class="big">🌴</div><h3>Plan your Indonesia trip</h3><p>Add flights, hotels, transfers and activities.<br>Each shows on the map with copyable addresses, local times and live travel times.</p>
       <div class="cta"><button class="btn lime" data-act="add">＋ Add first item</button><button class="btn ghost" data-act="addExample">Load a Bali example</button></div></div>`;
@@ -1297,7 +1360,7 @@ function renderHotspots(){
     : geoState==="locating" ? '<span class="chip">◎ locating…</span>'
     : geoState==="denied" ? '<span class="chip">◎ location off</span>'
     : '<button class="btn ghost sm" data-act="useLoc">◎ Use my location</button>';
-  let html=`<div class="sec-head"><h2>Hotspots</h2><div class="sp"></div>${locChip}<button class="btn lime" data-act="addHotspot">＋ Add</button></div><div class="hs-body">`;
+  let html=`<div class="sheet-grip"></div><div class="sec-head"><h2>Hotspots</h2><div class="sp"></div>${locChip}<button class="btn lime" data-act="addHotspot">＋ Add</button></div><div class="hs-body">`;
   if(!list.length){
     html+=`<div class="empty"><div class="big">📍</div><h3>No hotspots yet</h3><p>Save places you want to check out — food, sights, activities, shops. Paste a Google Maps link and we'll grab the details; they sort by closest to you.</p>
       <div class="cta"><button class="btn lime" data-act="addHotspot">＋ Add a hotspot</button></div></div>`;
@@ -1344,7 +1407,7 @@ function toggleHotspot(id){
   if(ui.expandedId) setHsExpanded(ui.expandedId,false);
   ui.expandedId=id; setHsExpanded(id,true);
   const h=(state.hotspots||[]).find(x=>x.id===id);
-  if(h&&h.location&&h.location.lat!=null&&!isMobile()&&map) map.flyTo([h.location.lat,h.location.lng],Math.max(map.getZoom(),14),{duration:.5});
+  if(h&&h.location&&h.location.lat!=null&&map) flyVisible([h.location.lat,h.location.lng],14);
 }
 function hotspotModal(item){
   draft = item ? JSON.parse(JSON.stringify(item)) : {id:uid(),type:"food",name:"",location:{},notes:"",photos:[],url:""};
@@ -1403,10 +1466,10 @@ function renderHotspotMarkers(){
     m.bindPopup(`<div class="pop"><div class="pt">${t.emoji} ${esc(h.name||t.label)}</div>${l.address?`<div class="pa">${esc(l.address)}</div>`:""}<div class="pactions"><a href="${gmap}" target="_blank" rel="noopener">↗ Maps</a></div></div>`,{maxWidth:240});
     markersById[h.id]=m;
   });
-  if(pts.length && map.getSize().x>0){ try{ map.fitBounds(L.latLngBounds(pts).pad(.3),{maxZoom:14}); }catch(e){} }
+  if(pts.length && map.getSize().x>0){ try{ map.fitBounds(L.latLngBounds(pts).pad(.3),{maxZoom:14, paddingTopLeft:[16,14], paddingBottomRight:[16, sheetCover()+12]}); }catch(e){} }
   $("#legend").innerHTML = pts.length?'<span><i style="background:#e0483d"></i>Saved hotspots</span>':'<span style="color:var(--faint)">Add a hotspot to see it here</span>';
 }
-function hsFocus(id){ const h=(state.hotspots||[]).find(x=>x.id===id); if(!h||!h.location||h.location.lat==null||!map) return; map.flyTo([h.location.lat,h.location.lng],Math.max(map.getZoom(),15),{duration:.5}); const m=markersById[id]; if(m) setTimeout(()=>m.openPopup(),350); }
+function hsFocus(id){ const h=(state.hotspots||[]).find(x=>x.id===id); if(!h||!h.location||h.location.lat==null||!map) return; flyVisible([h.location.lat,h.location.lng],15); const m=markersById[id]; if(m) setTimeout(()=>m.openPopup(),350); }
 
 /* ====================== WEATHER (Open-Meteo, no key) ====================== */
 const WX_STORE="indoTrip.wx";
@@ -1765,7 +1828,7 @@ document.addEventListener("click",e=>{
     case "rmFile": { const i=+a.dataset.i; if(draft&&draft.files){ draft.files.splice(i,1); renderItemFileChips(); } break; }
     case "goHotspot": { setView("hotspots"); ui.expandedId=id; renderMain();
       setTimeout(()=>{ const el=document.querySelector('.hs-card[data-hs="'+cssEsc(id)+'"]'); el?.scrollIntoView({block:"center",behavior:"smooth"});
-        const h=(state.hotspots||[]).find(x=>x.id===id); if(h&&h.location&&h.location.lat!=null&&!isMobile()&&map) map.flyTo([h.location.lat,h.location.lng],Math.max(map.getZoom(),14),{duration:.5}); },120);
+        const h=(state.hotspots||[]).find(x=>x.id===id); if(h&&h.location&&h.location.lat!=null&&map) flyVisible([h.location.lat,h.location.lng],14); },120);
       break; }
     case "newItem": closeModal(); itemModal(null); break;
     case "newHotspot": closeModal(); hotspotModal(null); break;
@@ -1808,10 +1871,8 @@ $("#fitBtn").addEventListener("click",()=>{ if(ui.view==="hotspots") refreshMap(
 $("#satBtn").addEventListener("click",toggleSat);
 $("#meBtn")?.addEventListener("click",recenterMe);
 $("#fab")?.addEventListener("click",openCreateMenu);
-function setMapCollapsed(c){ document.body.classList.toggle("map-collapsed", c); localStorage.setItem("indoTrip.mapCollapsed", c?"1":""); if(map) setTimeout(()=>{ try{ map.invalidateSize(); }catch(e){} },300); }
-$("#mapToggle").addEventListener("click",()=>setMapCollapsed(!document.body.classList.contains("map-collapsed")));
 $("#scrim").addEventListener("click",e=>{ if(e.target.id==="scrim") closeModal(); });
-let _rT; window.addEventListener("resize",()=>{ clearTimeout(_rT); _rT=setTimeout(()=>{ syncHeadH(); syncVVGap(); moveTabInd(); if(map){ map.invalidateSize(); if(!isMobile()||ui.view==="map") refreshMap(); } },140); });
+let _rT; window.addEventListener("resize",()=>{ clearTimeout(_rT); _rT=setTimeout(()=>{ syncHeadH(); syncVVGap(); moveTabInd(); if(isMobile()&&sheetViews()) setSheet(sheet.state,false); if(map){ map.invalidateSize(); if(!isMobile()||ui.view==="map") refreshMap(); } },140); });
 matchMedia("(max-width:859px)").addEventListener?.("change",()=>{ if(!isMobile()&&ui.view==="map") setView("today"); else if(map) setTimeout(()=>{ map.invalidateSize(); refreshMap(); },90); });
 
 /* ---- PWA: static manifest.webmanifest + icon-512.png in the repo.
@@ -1824,9 +1885,8 @@ function buildSplash(){ $("#splashWm").innerHTML=[..."INDO 2026"].map((ch,i)=>`<
 function hideSplash(){ const s=$("#splash"); if(s){ s.classList.add("done"); setTimeout(()=>s&&s.remove&&s.remove(),600); } }
 
 /* ---- boot ---- */
-function afterLoad(){ if(navigator.standalone) document.documentElement.classList.add("standalone"); document.body.dataset.itin=ui.itinMode; if(state.meta.sub) $("#tripSub").value=state.meta.sub; renderClocks(); renderMain(); refreshMap(); loadGoogle(); syncHeadH(); setTimeout(moveTabInd,80); }
+function afterLoad(){ if(navigator.standalone) document.documentElement.classList.add("standalone"); document.body.dataset.itin=ui.itinMode; if(state.meta.sub) $("#tripSub").value=state.meta.sub; renderClocks(); renderMain(); bindSheetGestures(); if(isMobile()&&sheetViews()) setSheet(sheet.state,false); refreshMap(); loadGoogle(); syncHeadH(); setTimeout(moveTabInd,80); }
 buildSplash();
-if(localStorage.getItem("indoTrip.mapCollapsed")) document.body.classList.add("map-collapsed");
 initMap();
 afterLoad();
 initFirebase();
