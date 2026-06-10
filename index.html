@@ -79,7 +79,7 @@
   .mapwrap{position:sticky; top:calc(var(--head-h) + 16px)}
   #map{height:calc(100vh - var(--head-h) - 90px); min-height:440px; width:100%; border-radius:var(--radius); z-index:1}
   .map-foot{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; border-top:1px solid var(--line); font-size:12.5px; color:var(--muted)}
-  @media(min-width:860px){ .map-foot #meBtn{margin-left:auto} }
+  @media(min-width:860px){ .map-foot #satBtn{margin-left:auto} }
   .legend{display:flex; gap:12px; flex-wrap:wrap}
   .legend span{display:inline-flex; align-items:center; gap:5px}
   .legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
@@ -411,7 +411,7 @@
   .datebar.open .chev{transform:rotate(180deg)}
   .gotoday{display:none; align-items:center; gap:4px; flex:none; padding:6px 12px; border-radius:20px; background:var(--accent-soft); color:var(--accent-deep); font-size:12px; font-weight:700; white-space:nowrap}
   .datebar.offday .gotoday{display:inline-flex; animation:gtpop .22s var(--ease)}
-  .datebar.offday .dsub{display:none}
+  .datebar.offday .datemain .dtz{display:none}
   .gotoday:active{transform:scale(.93)}
   @keyframes gtpop{from{opacity:0; transform:scale(.82)} to{opacity:1}}
   .daystrip{max-height:98px; overflow:hidden; transition:max-height .28s var(--ease), opacity .2s, padding .28s; border-bottom:1px solid var(--line)}
@@ -523,8 +523,8 @@
     <div class="fromme" id="fromme"></div>
     <div class="map-foot">
       <div class="legend" id="legend"></div>
-      <button class="btn ghost sm" id="meBtn" title="My location"><span class="mic">◎</span><span class="mlb">Me</span></button>
       <button class="btn ghost sm" id="satBtn" title="Satellite view"><span class="mic">🛰</span><span class="mlb">Satellite</span></button>
+      <button class="btn ghost sm" id="meBtn" title="My location"><span class="mic">◎</span><span class="mlb">Me</span></button>
       <button class="btn ghost sm" id="fitBtn"><span class="mic">⤢</span><span class="mlb">Fit all</span></button>
     </div>
   </section>
@@ -568,7 +568,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r20";
+const APP_BUILD = "10 Jun 2026 · r21";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -980,8 +980,7 @@ function renderToday(){
         <button class="datemain" data-act="togglePills">
           <span class="dbig" id="dbDate">${esc(fmtDateShort(cur.instant,cur.tz))}</span>
           <span class="chev">▾</span>
-          <span class="dsub" id="dbSub">Day ${ui.dayIdx+1}/${days.length}</span>
-          <span class="dtz" id="dbTz">${esc(tzAbbr(cur.tz))}</span>
+          <span class="dtz" id="dbSub">Day ${ui.dayIdx+1}/${days.length}</span>
         </button>
         <button class="gotoday" data-act="goToday" title="Go to current day">⊙ Today</button>
         ${itinToggleHTML()}
@@ -1058,7 +1057,7 @@ function tlLeg(lg){
       · <a href="${lg.gmapDir}" target="_blank" rel="noopener">route ↗</a></div></div>`,
     __leg:true, lg};
 }
-function updateDateBar(days,i){ const d=days[i]; if(!d) return; const D=$("#dbDate"),S=$("#dbSub"),T=$("#dbTz"); if(D)D.textContent=fmtDateShort(d.instant,d.tz); if(S)S.textContent="Day "+(i+1)+"/"+days.length; if(T)T.textContent=tzAbbr(d.tz);
+function updateDateBar(days,i){ const d=days[i]; if(!d) return; const D=$("#dbDate"),S=$("#dbSub"); if(D)D.textContent=fmtDateShort(d.instant,d.tz); if(S)S.textContent="Day "+(i+1)+"/"+days.length;
   const db=$("#datebar"); if(db){ const tk=dayKey(new Date(),state.meta.destTz); db.classList.toggle("offday", days.some(x=>x.key===tk) && d.key!==tk); } }
 function setupPager(days){
   const pager=$("#pager"), track=$("#pagerTrack"), strip=$("#daystrip"); if(!pager||!track) return;
