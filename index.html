@@ -79,6 +79,7 @@
   .mapwrap{position:sticky; top:calc(var(--head-h) + 16px)}
   #map{height:calc(100vh - var(--head-h) - 90px); min-height:440px; width:100%; border-radius:var(--radius); z-index:1}
   .map-foot{display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; border-top:1px solid var(--line); font-size:12.5px; color:var(--muted)}
+  @media(min-width:860px){ .map-foot #meBtn{margin-left:auto} }
   .legend{display:flex; gap:12px; flex-wrap:wrap}
   .legend span{display:inline-flex; align-items:center; gap:5px}
   .legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
@@ -316,11 +317,13 @@
     .mapwrap{display:none}
     /* merged Today = fixed flex column: map pinned on top, list scrolls below */
     body[data-view="today"] .app{position:fixed; top:calc(var(--head-h) + env(safe-area-inset-top)); bottom:calc(var(--bar-h) + env(safe-area-inset-bottom)); left:0; right:0; display:flex; flex-direction:column; align-items:stretch; padding:0}
-    body[data-view="today"] .mapwrap{display:block; order:-1; flex:0 0 40%; position:relative; top:0; border:none; border-radius:0; box-shadow:none; transition:flex-basis .28s var(--ease)}
+    body[data-view="today"] .mapwrap{display:block; order:-1; flex:0 0 40%; min-height:0; overflow:hidden; position:relative; top:0; border:none; border-radius:0; box-shadow:none; transition:flex-basis .28s var(--ease)}
     body.map-collapsed[data-view="today"] .mapwrap{flex-basis:0; min-height:0; border:none}
     body[data-view="today"] #main{flex:1 1 0; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 0 16px; touch-action:pan-y}
     body[data-view="today"] .pager{min-height:100%}
-    #map{height:100%; min-height:0; border-radius:0}
+    /* #map absolutely fills .mapwrap — it must never contribute to layout height,
+       or the %-height feedback loop (map → mapwrap min-content → map) can explode */
+    #map{position:absolute; inset:0; height:auto; min-height:0; border-radius:0}
     .map-foot{position:absolute; bottom:0; left:0; right:0; background:rgba(255,255,255,.9); backdrop-filter:blur(10px); z-index:2; border-top:1px solid var(--line)}
     .tabbar{display:flex}
     .daypage{padding:8px 14px 18px}
@@ -389,7 +392,10 @@
   @media(max-width:859px){
     body[data-view="today"] .legend{display:none}
     body[data-view="today"] .map-foot{position:absolute; top:auto; bottom:7px; left:9px; right:9px; width:auto; background:transparent; border:none; backdrop-filter:none; padding:0; gap:7px; flex-direction:row; flex-wrap:nowrap; align-items:center}
-    body[data-view="today"] .map-foot .btn{margin:0; flex:1 1 0; justify-content:center; padding:6px 6px; font-size:12px; border-radius:11px; background:rgba(255,255,255,.93); backdrop-filter:blur(8px); box-shadow:0 2px 8px rgba(0,0,0,.18); border-color:transparent; white-space:nowrap}
+    body[data-view="today"] .map-foot .btn{margin:0; flex:none; display:inline-flex; align-items:center; gap:5px; justify-content:center; padding:6px 11px; font-size:12px; border-radius:20px; background:rgba(255,255,255,.93); backdrop-filter:blur(8px); box-shadow:0 2px 8px rgba(0,0,0,.18); border-color:transparent; white-space:nowrap}
+    body[data-view="today"] .map-foot #meBtn, body[data-view="today"] .map-foot #satBtn{width:34px; height:34px; padding:0; border-radius:50%; font-size:14px}
+    body[data-view="today"] .map-foot #meBtn .mlb, body[data-view="today"] .map-foot #satBtn .mlb{display:none}
+    body[data-view="today"] .map-foot #fitBtn{margin-left:auto}
     body[data-view="today"] .mapwrap .leaflet-bottom .leaflet-control{margin-bottom:38px}
   }
 
@@ -517,9 +523,9 @@
     <div class="fromme" id="fromme"></div>
     <div class="map-foot">
       <div class="legend" id="legend"></div>
-      <button class="btn ghost sm" id="meBtn" style="margin-left:auto">◎ Me</button>
-      <button class="btn ghost sm" id="satBtn">🛰 Satellite</button>
-      <button class="btn ghost sm" id="fitBtn">⤢ Fit all</button>
+      <button class="btn ghost sm" id="meBtn" title="My location"><span class="mic">◎</span><span class="mlb">Me</span></button>
+      <button class="btn ghost sm" id="satBtn" title="Satellite view"><span class="mic">🛰</span><span class="mlb">Satellite</span></button>
+      <button class="btn ghost sm" id="fitBtn"><span class="mic">⤢</span><span class="mlb">Fit all</span></button>
     </div>
   </section>
 </div>
@@ -562,7 +568,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "10 Jun 2026 · r19";
+const APP_BUILD = "10 Jun 2026 · r20";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -723,7 +729,7 @@ function initMap(){
 function toggleSat(){ satOn=!satOn;
   if(satOn){ map.removeLayer(baseStd); baseSat.addTo(map); satLabels.addTo(map); }
   else { map.removeLayer(baseSat); map.removeLayer(satLabels); baseStd.addTo(map); }
-  const b=$("#satBtn"); if(b) b.textContent=satOn?"🗺 Map":"🛰 Satellite";
+  const b=$("#satBtn"); if(b){ const ic=b.querySelector(".mic"), lb=b.querySelector(".mlb"); if(ic) ic.textContent=satOn?"🗺":"🛰"; if(lb) lb.textContent=satOn?"Map":"Satellite"; }
 }
 function pinIcon(type){ const t=TYPES[type]||TYPES.other; const color=TYPE_HEX[type]||"#0e9aa0";
   return L.divIcon({className:"",html:`<div class="epin" style="--c:${color}"><span>${t.emoji}</span></div>`,iconSize:[30,37],iconAnchor:[15,35],popupAnchor:[0,-32]}); }
