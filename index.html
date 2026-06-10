@@ -444,6 +444,25 @@
   .hs-thumb{position:relative; width:62px; height:62px; border-radius:10px; background-size:cover; background-position:center; background-color:var(--bg); display:block; border:1px solid var(--line)}
   .hs-rm{position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--ink); color:#fff; font-size:11px; display:flex; align-items:center; justify-content:center}
 
+  /* "from you" nav estimate — floats at the bottom of the map */
+  .fromme{position:absolute; left:9px; bottom:9px; z-index:5; display:none; align-items:center; gap:7px; max-width:calc(100% - 128px);
+    background:rgba(255,255,255,.94); backdrop-filter:blur(8px); border-radius:12px; padding:7px 11px; font-size:12.5px; box-shadow:0 2px 10px rgba(0,0,0,.18); flex-wrap:wrap}
+  .fromme .fl{font-weight:700; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .fromme a{font-weight:600; white-space:nowrap}
+  @media(min-width:860px){ .fromme{bottom:58px} }
+
+  /* nearby hotspots inside an expanded item */
+  .nearby{margin-top:10px; border:1px solid var(--line); border-radius:11px; overflow:hidden}
+  .nb-h{font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:700; padding:8px 11px 5px; background:var(--bg)}
+  .nb-row{display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; text-align:left; padding:9px 11px; border-top:1px solid var(--line); font-size:13.5px; background:var(--card)}
+  .nb-row:hover{background:var(--bg)}
+  .nb-d{flex:none; font-size:11.5px; font-weight:600; color:var(--blue); background:#e7f0ff; padding:2px 8px; border-radius:20px}
+
+  /* docs: itinerary-items folder */
+  .sec-sub{font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:700; margin:18px 2px 8px}
+  .itdoc{border:1px solid var(--line); border-radius:12px; padding:11px 13px; margin:8px 0; background:var(--card)}
+  .itdoc-t{font-weight:600; font-size:14px; margin-bottom:7px}
+
   /* create menu */
   .create-grid{display:flex; flex-direction:column; gap:10px; padding:8px 0 4px}
   .create-opt{display:flex; align-items:center; gap:14px; padding:16px; border:1px solid var(--line); border-radius:14px; background:var(--card); font-weight:600; font-size:15px; text-align:left}
@@ -484,6 +503,7 @@
   <main class="panel" id="main"></main>
   <section class="panel mapwrap">
     <div id="map"></div>
+    <div class="fromme" id="fromme"></div>
     <div class="map-foot">
       <div class="legend" id="legend"></div>
       <button class="btn ghost sm" id="meBtn" style="margin-left:auto">◎ Me</button>
@@ -531,6 +551,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
+const APP_BUILD = "10 Jun 2026 · r10";
 const IDN_ZONES = [
   {tz:"Asia/Makassar", abbr:"WITA", label:"Bali / Lombok / Sulawesi (WITA, UTC+8)"},
   {tz:"Asia/Jakarta",  abbr:"WIB",  label:"Jakarta / Java / Sumatra (WIB, UTC+7)"},
@@ -732,6 +753,7 @@ function focusItem(id){
   const run=()=>{
     if(!map) return;
     const pts=locsOf(it); if(!pts.length) return;
+    const navLoc=startLoc(it)||endLoc(it); showFromMe(navLoc,(navLoc&&navLoc.name)||it.title);
     const pm = markersById[id] || markersById[id+"-to"] || markersById[id+"-main"] || markersById[id+"-from"];
     const far = pts.length>1 && pts[0].distanceTo(pts[pts.length-1])>400000; // >400km = a flight: don't zoom out to the world
     if(pts.length>1 && !far){
@@ -813,6 +835,7 @@ function collapseItem(){
   if(!ui.expandedId) return;
   setCardExpanded(ui.expandedId,false);
   ui.expandedId=null;
+  hideFromMe();
 }
 
 /* ---- passcode lock ---- */
@@ -875,6 +898,7 @@ function moveTabInd(){
 function setView(v){
   ui.view=v; document.body.dataset.view=v;
   document.querySelectorAll("button[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
+  hideFromMe();
   if(v==="itinerary"||v==="documents"||v==="settings"||v==="hotspots") applyMapFocus(null);
   if(v==="hotspots" && geoState==="off") startGeo();
   renderMain();
@@ -981,12 +1005,15 @@ function tlRow(it,isLast){
     : (it.location&&(it.location.name||it.location.address)) ? esc(it.location.name||it.location.address) : "";
   const docs=(it.docIds||[]).map(x=>state.docs.find(d=>d.id===x)).filter(Boolean);
   const locsFull = isLeg ? (locLineHTML(it,it.fromLoc,"from")+locLineHTML(it,it.toLoc,"to")) : locLineHTML(it,it.location,"main");
+  const nb=nearbyHotspots(it);
   const expand = `<div class="tl-expand"${it.id===ui.expandedId?' style="max-height:none"':''}>
       ${whenHTML(it)}
       ${locsFull||""}
       ${it.conf?`<div class="ref" style="margin-top:8px">Booking ref <span class="mono">${esc(it.conf)}</span> <button class="iconbtn" style="width:22px;height:22px;vertical-align:-5px" data-act="copy-conf" data-id="${it.id}">⧉</button></div>`:""}
       ${it.notes?`<div class="note">${esc(it.notes)}</div>`:""}
       ${docs.length?`<div class="chiprow" style="margin-top:8px">${docs.map(d=>`<span class="chip doc" data-act="opendoc" data-url="${esc(d.url)}">📎 ${esc(d.title)}</span>`).join("")}</div>`:""}
+      ${(it.files&&it.files.length)?`<div class="chiprow" style="margin-top:8px">${it.files.map(f=>`<a class="chip doc" href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name)}</a>`).join("")}</div>`:""}
+      ${nb.length?`<div class="nearby"><div class="nb-h">📍 Nearby hotspots</div>${nb.map(x=>`<button class="nb-row" data-act="goHotspot" data-id="${x.h.id}"><span>${(HOTSPOT_TYPES[x.h.type]||HOTSPOT_TYPES.other).emoji} ${esc(x.h.name)}</span><span class="nb-d">${distLabel(x.d)}</span></button>`).join("")}</div>`:""}
       <div style="margin-top:12px"><button class="btn lime sm" data-act="edit" data-id="${it.id}">✎ Edit</button></div>
     </div>`;
   return {__item:true, html:`<div class="tl-row ${isLast?"last":""} ${it.id===ui.expandedId?'rowexp':''}">
@@ -1013,7 +1040,7 @@ function setupPager(days){
   const w=()=>pager.clientWidth||1;
   const sync=i=>{ document.querySelectorAll(".daypill").forEach((q,j)=>q.classList.toggle("active",j===i));
     const ap=document.querySelectorAll(".daypill")[i]; ap?.scrollIntoView({inline:"center",block:"nearest",behavior:"smooth"});
-    applyMapFocus(days[i]?.key||null); updateDateBar(days,i);
+    hideFromMe(); applyMapFocus(days[i]?.key||null); updateDateBar(days,i);
     if(googleReady) days[i]?.items.forEach((it,k)=>{ const lg=legInfo(it,days[i].items[k+1]); if(lg) fetchLeg(lg.id,lg.o,lg.d,lg.departInst); }); };
   const place=(i,anim)=>{ track.style.transition = anim?"transform .4s cubic-bezier(.3,1.04,.35,1)":"none"; track.style.transform="translateX("+(-i*100)+"%)"; };
   const setTo=(i,anim)=>{ i=Math.max(0,Math.min(days.length-1,i)); ui.dayIdx=i; place(i, anim!==false); sync(i); };
@@ -1070,6 +1097,7 @@ function itemCard(it){ const t=TYPES[it.type]||TYPES.other; const docs=(it.docId
       ${whenHTML(it)}${locs}
       ${it.conf?`<div class="chiprow"><span class="chip"><span class="k">Ref</span> <span class="mono">${esc(it.conf)}</span><button class="iconbtn" style="width:22px;height:22px" title="Copy ref" data-act="copy-conf" data-id="${it.id}">⧉</button></span></div>`:""}
       ${docs.length?`<div class="chiprow">${docs.map(d=>`<span class="chip doc" data-act="opendoc" data-url="${esc(d.url)}">📎 ${esc(d.title)}</span>`).join("")}</div>`:""}
+      ${(it.files&&it.files.length)?`<div class="chiprow">${it.files.map(f=>`<a class="chip doc" href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name)}</a>`).join("")}</div>`:""}
       ${it.notes?`<div class="notes">${esc(it.notes)}</div>`:""}
     </div>
     <button class="iconbtn edit" title="Edit" data-act="edit" data-id="${it.id}">✎</button></div>`;
@@ -1114,10 +1142,16 @@ function renderDocuments(){
   } else {
     html+=`<div class="drive"><span class="gic">📁</span><span><div class="t">No Drive folder linked yet</div><div class="s">Paste your shared Google Drive link so all your booking PDFs live here.</div></span><button class="btn ghost sm" style="margin-left:auto" data-act="setDrive">Add link</button></div>`;
   }
+  const withFiles=sortedItems().filter(i=>i.files&&i.files.length);
+  if(withFiles.length){
+    html+=`<div class="sec-sub">📂 Itinerary items</div>`+withFiles.map(it=>{ const t=TYPES[it.type]||TYPES.other;
+      return `<div class="itdoc"><div class="itdoc-t">${t.emoji} ${esc(it.title||t.label)}</div><div class="chiprow">${it.files.map(f=>`<a class="chip doc" href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name)}</a>`).join("")}</div></div>`; }).join("");
+    if(state.docs.length) html+=`<div class="sec-sub">🔗 Linked documents</div>`;
+  }
   if(state.docs.length){
     html+=`<div class="doc-grid">`+state.docs.map(d=>`<a class="doccard" href="${esc(d.url)}" target="_blank" rel="noopener"><span class="dic">${DOC_ICON[d.cat]||"📄"}</span><span><div class="t">${esc(d.title)}</div><div class="cat">${esc(d.cat||"Other")}${d.note?" · "+esc(d.note):""}</div></span><button class="iconbtn x" title="Delete" data-act="delDoc" data-id="${d.id}" onclick="event.preventDefault()">✕</button></a>`).join("")+`</div>`;
-  } else {
-    html+=`<div class="empty"><div class="big">📄</div><h3>No documents yet</h3><p>Add links (boarding passes, hotel confirmations, insurance) — or just link the whole Drive folder above.</p><div class="cta"><button class="btn lime" data-act="addDoc">＋ Add document</button></div></div>`;
+  } else if(!withFiles.length){
+    html+=`<div class="empty"><div class="big">📄</div><h3>No documents yet</h3><p>Add links (boarding passes, hotel confirmations, insurance), upload files onto itinerary items — or just link the whole Drive folder above.</p><div class="cta"><button class="btn lime" data-act="addDoc">＋ Add document</button></div></div>`;
   }
   $("#main").innerHTML=html+`</div>`;
 }
@@ -1144,6 +1178,33 @@ function updateUserMarker(){ if(!map||!userLoc) return; const ll=[userLoc.lat,us
   else userMarker.setLatLng(ll); }
 function recenterMe(){ if(!map) return; if(userLoc) map.flyTo([userLoc.lat,userLoc.lng], Math.max(map.getZoom(),14), {duration:.5}); else startGeo(); }
 function refLoc(){ return userLoc || {lat:-8.5,lng:115.2}; }
+/* "from you" nav estimate under the map */
+let fromMeReq=0;
+function showFromMe(loc,label){
+  const el=$("#fromme"); if(!el) return;
+  if(!loc||loc.lat==null){ el.style.display="none"; return; }
+  const gq=loc.lat+","+loc.lng;
+  const dir=userLoc?`https://www.google.com/maps/dir/?api=1&origin=${userLoc.lat},${userLoc.lng}&destination=${gq}&travelmode=driving`
+                   :`https://www.google.com/maps/dir/?api=1&destination=${gq}&travelmode=driving`;
+  let est;
+  if(userLoc){ const km=haversineKm(userLoc,loc); est=`<b>${distLabel(km)}</b> · ~${durText(Math.max(5,Math.round(km/32*60))*60000)} drive`; }
+  else est=`<button style="color:var(--accent-deep);font-weight:600" data-act="useLoc">◎ enable location</button>`;
+  el.innerHTML=`🧭 <span class="fl">${esc(label||"")}</span> <span class="fe">${est}</span> <a href="${dir}" target="_blank" rel="noopener">Directions ↗</a>`;
+  el.style.display="flex";
+  if(userLoc&&googleReady){ const my=++fromMeReq;
+    gDirections({lat:userLoc.lat,lng:userLoc.lng},{lat:loc.lat,lng:loc.lng},new Date()).then(r=>{
+      if(my!==fromMeReq||!r||r.error) return;
+      const fe=el.querySelector(".fe"); if(fe) fe.innerHTML=`<b>${esc(r.traffic||r.dur)}</b> drive · ${esc(r.dist||"")} <span class="badge-live">live</span>`;
+    });
+  }
+}
+function hideFromMe(){ const el=$("#fromme"); if(el) el.style.display="none"; }
+/* hotspots near an itinerary item (cut anything in a completely different place) */
+function nearbyHotspots(it,maxKm=15,maxN=4){
+  const base=startLoc(it)||endLoc(it); if(!base) return [];
+  return (state.hotspots||[]).map(h=>({h, d:(h.location&&h.location.lat!=null)?haversineKm(base,h.location):Infinity}))
+    .filter(x=>x.d<=maxKm).sort((a,b)=>a.d-b.d).slice(0,maxN);
+}
 function hotspotDist(h){ const l=h.location; if(!l||l.lat==null) return Infinity; return haversineKm(refLoc(), l); }
 function sortedHotspots(){ return [...(state.hotspots||[])].sort((a,b)=>hotspotDist(a)-hotspotDist(b)); }
 function distLabel(km){ return km<1?Math.round(km*1000)+" m":km.toFixed(km<10?1:0)+" km"; }
@@ -1297,7 +1358,8 @@ function renderSettings(){ const m=state.meta; const keyOn=!!m.mapsKey;
         ${state.meta.passHash?`<button class="btn danger sm" data-act="clearPass">Remove</button>`:""}
       </div>
       <div class="hint">A lock screen when the app opens, shared with Elisa. Soft (client-side) protection — keeps casual eyes out.</div></div>
-    <div class="field"><label>Install</label><div class="hint">On iPhone: Safari → Share → <b>Add to Home Screen</b> to launch INDO 2026 full-screen like a real app.</div></div>
+    <div class="field"><label>Install</label><div class="hint">On iPhone: Safari → Share → <b>Add to Home Screen</b> to launch INDO 2026 full-screen like a real app.</div>
+      <div class="hint" style="margin-top:6px">Build <span class="mono">${esc(APP_BUILD)}</span> — if a fix doesn't show, fully close and reopen the app.</div></div>
   </div>`;
   setSyncStatus(syncStatus);
 }
@@ -1307,7 +1369,7 @@ function openModal(html){ $("#modal").innerHTML=html; $("#scrim").classList.add(
 function closeModal(){ $("#scrim").classList.remove("show"); $("#modal").innerHTML=""; }
 let draft=null;
 function itemModal(item){
-  draft=item?JSON.parse(JSON.stringify(item)):{id:uid(),type:"activity",title:"",date:"",time:"",tz:state.meta.destTz,location:{},docIds:[]};
+  draft=item?JSON.parse(JSON.stringify(item)):{id:uid(),type:"activity",title:"",date:"",time:"",tz:state.meta.destTz,location:{},docIds:[],files:[]};
   const isLeg=TYPES[draft.type]?.legtoo;
   const typeBtns=Object.entries(TYPES).map(([k,t])=>`<button type="button" class="typebtn${draft.type===k?" on":""}" data-type="${k}"><span class="e">${t.emoji}</span>${t.label}</button>`).join("");
   const docChecks=state.docs.length?state.docs.map(d=>`<label><input type="checkbox" data-doc="${d.id}" ${(draft.docIds||[]).includes(d.id)?"checked":""}> ${DOC_ICON[d.cat]||"📄"} ${esc(d.title)}</label>`).join(""):`<span style="color:var(--faint);font-size:13px">No documents yet — add them on the Documents tab.</span>`;
@@ -1325,11 +1387,28 @@ function itemModal(item){
       <div class="field"><label>Booking / confirmation ref (optional)</label><input class="inp mono" id="f-conf" value="${esc(draft.conf||"")}" placeholder="e.g. ABC123"></div>
       <div class="field"><label>Notes (optional)</label><textarea class="inp" id="f-notes" placeholder="Anything useful — terminal, room type, what to bring…">${esc(draft.notes||"")}</textarea></div>
       <div class="field"><label>Attach documents</label><div class="checklist">${docChecks}</div></div>
+      <div class="field"><label>Upload files (tickets, confirmations, PDFs…)</label>
+        <div class="chiprow" id="iFiles">${(draft.files||[]).map((f,i)=>`<span class="chip">📎 ${esc(f.name)} <button class="hs-rm" style="position:static;width:17px;height:17px;margin-left:3px" data-act="rmFile" data-i="${i}">✕</button></span>`).join("")}</div>
+        <label class="btn ghost sm" style="margin-top:8px;display:inline-flex">⬆ Upload file<input type="file" id="iFile" multiple style="display:none"></label>
+        <div class="hint" id="iUpStatus">${fstore?"Stored in your shared trip — they show inside the item and in Docs.":"File upload needs cloud sync."}</div>
+      </div>
     </div>
     <div class="mf">${item?`<button class="btn danger" data-act="delItem" data-id="${draft.id}">Delete</button>`:""}
       <div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn lime" data-act="saveItem">${item?"Save":"Add to trip"}</button></div></div>`);
   renderLocBlock();
   $("#typeGrid").addEventListener("click",e=>{ const b=e.target.closest(".typebtn"); if(!b)return; draft.type=b.dataset.type; collectItemForm(); itemModal(draft); });
+  $("#iFile")?.addEventListener("change",e=>handleItemFiles(e.target.files));
+}
+function renderItemFileChips(){ const row=$("#iFiles"); if(row) row.innerHTML=(draft.files||[]).map((f,i)=>`<span class="chip">📎 ${esc(f.name)} <button class="hs-rm" style="position:static;width:17px;height:17px;margin-left:3px" data-act="rmFile" data-i="${i}">✕</button></span>`).join(""); }
+async function handleItemFiles(files){
+  if(!fstore){ toast("File upload needs cloud sync"); return; }
+  const st=$("#iUpStatus"); if(st) st.textContent="Uploading…"; draft.files=draft.files||[];
+  for(const f of files){ try{
+    const r=fstore.ref("trips/"+tripId+"/items/"+draft.id+"/"+uid()+"_"+f.name.replace(/[^\w.\- ]/g,""));
+    await r.put(f); draft.files.push({name:f.name, url:await r.getDownloadURL(), type:f.type||"", size:f.size||0});
+  }catch(e){ if(st) st.textContent="Upload failed — check connection"; return; } }
+  renderItemFileChips();
+  if(st) st.textContent="Done — "+draft.files.length+" file"+(draft.files.length===1?"":"s")+" attached.";
 }
 function locFieldHTML(prefix,label,loc){ loc=loc||{};
   return `<div class="subsec"><h4>${label}</h4><div style="display:flex;gap:8px"><input class="inp" id="${prefix}-q" placeholder="Search place or address…" value="${esc(loc.name||"")}"><button class="btn ghost sm" type="button" data-geo="${prefix}">Search</button></div>
@@ -1412,6 +1491,11 @@ document.addEventListener("click",e=>{
     case "hsFocus": hsFocus(id); break;
     case "useLoc": startGeo(); break;
     case "rmPhoto": { const i=+a.dataset.i; if(draft&&draft.photos){ draft.photos.splice(i,1); const row=$("#hPhotos"); if(row) row.innerHTML=draft.photos.map((u,k)=>`<div class="hs-thumb" style="background-image:url('${esc(u)}')"><button class="hs-rm" data-act="rmPhoto" data-i="${k}">✕</button></div>`).join(""); } break; }
+    case "rmFile": { const i=+a.dataset.i; if(draft&&draft.files){ draft.files.splice(i,1); renderItemFileChips(); } break; }
+    case "goHotspot": { setView("hotspots"); ui.expandedId=id; renderMain();
+      setTimeout(()=>{ const el=document.querySelector('.hs-card[data-hs="'+cssEsc(id)+'"]'); el?.scrollIntoView({block:"center",behavior:"smooth"});
+        const h=(state.hotspots||[]).find(x=>x.id===id); if(h&&h.location&&h.location.lat!=null&&!isMobile()&&map) map.flyTo([h.location.lat,h.location.lng],Math.max(map.getZoom(),14),{duration:.5}); },120);
+      break; }
     case "newItem": closeModal(); itemModal(null); break;
     case "newHotspot": closeModal(); hotspotModal(null); break;
     case "newDoc": closeModal(); docModal(); break;
