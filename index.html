@@ -659,7 +659,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r47";
+const APP_BUILD = "11 Jun 2026 · r48";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1251,7 +1251,7 @@ function tlRow(it,isLast){
   const badge = it._st==="now"?'<span class="stat now">Now</span>':it._st==="next"?'<span class="stat next">Up next</span>':"";
   const isLeg=(TYPES[it.type]||{}).legtoo && it.fromLoc;
   let timeHtml = (si&&it.time)?`${fmtTime(si,sTz)}<span class="z">${esc(tzAbbr(sTz))}</span>`:`–`;
-  if(si&&it.time&&sTz!==state.meta.destTz){ const plus=dayKey(si,state.meta.destTz)!==dayKey(si,sTz)?"⁺¹":""; timeHtml+=`<span class="talt">≈ ${fmtTime(si,state.meta.destTz)}${plus} ${esc(tzAbbr(state.meta.destTz))}</span>`; }
+  if(si&&it.time&&sTz!==state.meta.destTz){ const dd=Math.round((new Date(dayKey(si,state.meta.destTz))-new Date(dayKey(si,sTz)))/86400000); const plus=dd>0?"⁺¹":dd<0?"⁻¹":""; timeHtml+=`<span class="talt">≈ ${fmtTime(si,state.meta.destTz)}${plus} ${esc(tzAbbr(state.meta.destTz))}</span>`; }
   const brief = isLeg ? `${esc(it.fromLoc?.name||"")} → ${esc(it.toLoc?.name||"")}`
     : (it.location&&(it.location.name||it.location.address)) ? esc(it.location.name||it.location.address) : "";
   const _dseen=new Set(); const docs=[...(it.docIds||[]).map(x=>state.docs.find(d=>d.id===x)), ...state.docs.filter(d=>d.itemId===it.id)].filter(d=>d&&!_dseen.has(d.id)&&_dseen.add(d.id));
@@ -1277,7 +1277,7 @@ function tlRow(it,isLast){
       <div style="margin-top:12px; display:flex; gap:7px; flex-wrap:wrap">${it.type==="flight"?`<a class="btn ghost sm" href="${flightStatusUrl(it)}" target="_blank" rel="noopener">✈️ Flight status</a>`:""}<button class="btn lime sm" data-act="edit" data-id="${it.id}">✎ Edit</button></div>
     </div>`;
   return {__item:true, html:`<div class="tl-row ${isLast?"last":""} ${it.id===ui.expandedId?'rowexp':''}">
-    <div class="tl-time mono">${timeHtml}${ei&&isLeg?`<br>${fmtTime(ei,eTz)}${(()=>{ const dd=it.date&&it.date2?Math.round((new Date(it.date2)-new Date(it.date))/86400000):0; return dd>0?`<sup class="plusd">+${dd}</sup>`:""; })()}<span class="z">${esc(tzAbbr(eTz))}</span>`:""}</div>
+    <div class="tl-time mono">${timeHtml}${ei&&isLeg?`<br>${fmtTime(ei,eTz)}${(()=>{ const dd=it.date&&it.date2?Math.round((new Date(it.date2)-new Date(it.date))/86400000):0; return dd!==0?`<sup class="plusd">${dd>0?"+":"\u2212"}${Math.abs(dd)}</sup>`:""; })()}<span class="z">${esc(tzAbbr(eTz))}</span>`:""}</div>
     <div class="tl-rail"><span class="tl-dot" style="--c:${color}"></span></div>
     <div class="tl-card ${cls} ${it.done?"done":""} ${it.id===ui.expandedId?'expanded':''}" data-card="${it.id}">
       <div class="h"><span class="e">${t.emoji}</span><span class="t">${esc(it.title||t.label)}</span>${badge}${thumb}</div>
