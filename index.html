@@ -339,6 +339,7 @@
     body[data-view="today"] .sheet-grip, body[data-view="hotspots"] .sheet-grip{display:flex}
     body[data-view="today"] .todayhead{top:22px}
     body[data-view="hotspots"] .sec-head, body[data-view="today"] .itinbar{position:sticky; top:22px; z-index:6; background:var(--card)}
+    body[data-view="today"] .alltl .daybar{position:sticky; top:68px; z-index:5; background:var(--card); margin:14px 0 8px; padding:5px 2px}
     /* #map absolutely fills .mapwrap — it must never contribute to layout height,
        or the %-height feedback loop (map → mapwrap min-content → map) can explode */
     #map{position:absolute; inset:0; height:auto; min-height:0; border-radius:0}
@@ -434,6 +435,24 @@
   .datebar.offday .datemain .dtz{display:none}
   .wx{flex:none; font-size:10.5px; font-weight:600; color:#3a5bd9; background:#edf2ff; padding:2px 8px; border-radius:20px; white-space:nowrap}
   .copyday-wrap{display:flex; justify-content:center; margin-top:16px}
+  /* up-next banner (today only) */
+  .upnext{display:flex; align-items:center; gap:9px; width:100%; text-align:left; background:var(--accent-soft); border:1.5px solid rgba(95,139,6,.25); border-radius:13px; padding:11px 14px; margin:2px 0 12px; font-size:14px}
+  .upnext .ue{font-size:18px; flex:none}
+  .upnext .ut{font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .upnext .uc{flex:none; margin-left:auto; font-weight:700; color:var(--accent-deep); font-size:13px; white-space:nowrap}
+  .upnext:active{transform:scale(.985)}
+  /* numbered day pins */
+  .epin .pnum{position:absolute; top:-7px; right:-8px; min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:var(--ink); color:#fff; font-size:10.5px; font-weight:700; font-style:normal; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(0,0,0,.35)}
+  /* calm location rows: tap text to copy, one big ↗ */
+  .loc{display:flex; align-items:flex-start; gap:8px}
+  .loc-txt{flex:1; min-width:0; text-align:left; padding:3px 0; line-height:1.45}
+  .loc-txt .nm{font-weight:600}
+  .loc-txt:active{opacity:.55}
+  .locgo{flex:none; width:40px; height:40px; border-radius:12px; border:1px solid var(--line); background:var(--card); display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--accent-deep)}
+  .refbtn{display:inline-flex; align-items:center; gap:7px; margin-top:9px; padding:9px 13px; border:1px dashed var(--line-strong); border-radius:11px; background:var(--bg); font-size:13px; color:var(--muted)}
+  .refbtn .mono{color:var(--ink); font-weight:600}
+  .refbtn:active{opacity:.55}
+  .tl-expand .btn.sm{padding:9px 14px}
   .esscard{border:1.5px solid #f1c8c4; background:#fff7f6; border-radius:14px; padding:13px 15px; margin:4px 0 14px}
   .ess-h{display:flex; align-items:center; gap:6px; font-weight:700; font-size:14.5px; margin-bottom:7px}
   .ess-h .iconbtn:first-of-type{margin-left:auto}
@@ -598,7 +617,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r35";
+const APP_BUILD = "11 Jun 2026 · r36";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -762,13 +781,13 @@ function toggleSat(){ satOn=!satOn;
   else { map.removeLayer(baseSat); map.removeLayer(satLabels); baseStd.addTo(map); }
   const b=$("#satBtn"); if(b){ const ic=b.querySelector(".mic"), lb=b.querySelector(".mlb"); if(ic) ic.textContent=satOn?"🗺":"🛰"; if(lb) lb.textContent=satOn?"Map":"Satellite"; }
 }
-function pinIcon(type){ const t=TYPES[type]||TYPES.other; const color=TYPE_HEX[type]||"#0e9aa0";
-  return L.divIcon({className:"",html:`<div class="epin" style="--c:${color}"><span>${t.emoji}</span></div>`,iconSize:[30,37],iconAnchor:[15,35],popupAnchor:[0,-32]}); }
+function pinIcon(type,num){ const t=TYPES[type]||TYPES.other; const color=TYPE_HEX[type]||"#0e9aa0";
+  return L.divIcon({className:"",html:`<div class="epin" style="--c:${color}">${num?`<i class="pnum">${num}</i>`:""}<span>${t.emoji}</span></div>`,iconSize:[30,37],iconAnchor:[15,35],popupAnchor:[0,-32]}); }
 function refreshMap(){
   if(!map) return;
   if(ui.view==="hotspots"){ renderHotspotMarkers(); return; }
   markerLayer.clearLayers(); lineLayer.clearLayers(); markersById={};
-  const allPts=[], emphPts=[], linePts=[]; let n=0;
+  const allPts=[], emphPts=[], linePts=[], dayLine=[]; let n=0, dayN=0;
   sortedItems().forEach(it=>{
     const t=TYPES[it.type]||TYPES.other; const inDay = !focusDayKey || itemDayKey(it)===focusDayKey;
     const places=[];
@@ -777,9 +796,10 @@ function refreshMap(){
     if(!places.length && it.location&&it.location.lat!=null) places.push({loc:it.location,role:"main"});
     places.forEach(p=>{
       n++; const ll=[p.loc.lat,p.loc.lng]; linePts.push(ll);
+      let pinNum=0; if(focusDayKey&&inDay){ dayN++; pinNum=dayN; dayLine.push(ll); }
       const fitOk = !(it.type==="flight" && p.role==="from"); // don't let a far-flung departure airport drive the zoom
       if(fitOk){ allPts.push(ll); if(inDay) emphPts.push(ll); }
-      const m=L.marker(ll,{icon:pinIcon(it.type),opacity:focusDayKey&&!inDay?0.35:1}).addTo(markerLayer);
+      const m=L.marker(ll,{icon:pinIcon(it.type,pinNum),opacity:focusDayKey&&!inDay?0.35:1}).addTo(markerLayer);
       const gmap=`https://www.google.com/maps/search/?api=1&query=${p.loc.lat},${p.loc.lng}`;
       m.bindPopup(`<div class="pop"><div class="pt">${t.emoji} ${esc(it.title||t.label)}</div>`+
         (p.loc.name?`<div class="pa">${esc(p.loc.name)}</div>`:"")+(p.loc.address?`<div class="pa">${esc(p.loc.address)}</div>`:"")+
@@ -789,7 +809,8 @@ function refreshMap(){
       markersById[it.id+"-"+p.role]=m; if(p.role==="main"||p.role==="to") markersById[it.id]=m;
     });
   });
-  if(linePts.length>1) L.polyline(linePts,{color:"#14160f",weight:1.5,opacity:.22,dashArray:"4 6"}).addTo(lineLayer);
+  if(focusDayKey){ if(dayLine.length>1) L.polyline(dayLine,{color:"#5f8b06",weight:2,opacity:.55,dashArray:"5 6"}).addTo(lineLayer); }
+  else if(linePts.length>1) L.polyline(linePts,{color:"#14160f",weight:1.5,opacity:.22,dashArray:"4 6"}).addTo(lineLayer);
   const fitPts = (focusDayKey&&emphPts.length)?emphPts:allPts;
   if(fitPts.length && map.getSize().x>0){ try{ map.fitBounds(L.latLngBounds(fitPts).pad(.25),{maxZoom:14, paddingTopLeft:[16,14], paddingBottomRight:[16, sheetCover()+12]}); }catch(e){} }
   const used=[...new Set(state.items.map(i=>i.type))];
@@ -1029,7 +1050,10 @@ function moveTabInd(){
   ind.style.transform="translate("+Math.round(tr.left-br.left)+"px,"+Math.round(tr.top-br.top)+"px)";
   ind.style.opacity=1;
 }
+function viewScroller(v){ return (isMobile() && (v==="today"||v==="hotspots")) ? $("#main") : document.scrollingElement; }
 function setView(v){
+  if(!ui._scroll) ui._scroll={};
+  { const sc=viewScroller(ui.view); if(sc) ui._scroll[ui.view]=sc.scrollTop; }
   ui.view=v; document.body.dataset.view=v; document.body.dataset.itin=ui.itinMode;
   document.querySelectorAll("button[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
   hideFromMe();
@@ -1040,6 +1064,7 @@ function setView(v){
   if(isMobile() && sheetViews()) setSheet(sheet.state,false);
   else if(mc) mc.style.touchAction="";
   moveTabInd(); syncHeadH();
+  requestAnimationFrame(()=>{ const sc=viewScroller(v); if(sc&&ui._scroll&&ui._scroll[v]!=null) sc.scrollTop=ui._scroll[v]; });
   if(map) setTimeout(()=>{ syncHeadH(); map.invalidateSize(); if(v==="today"||v==="hotspots"||!isMobile()) refreshMap(); },70);
 }
 function renderMain(){
@@ -1131,9 +1156,18 @@ function dayTimelineHTML(d,todayKey){
   }
   return items.length? `<div class="tl">${rows.map(r=>r.html).join("")}</div>` : `<div class="freeday">🌴 No plans — free day</div>`;
 }
+function durShort(ms){ const m=Math.max(1,Math.round(ms/60000)); const h=Math.floor(m/60); return h? h+"h "+String(m%60).padStart(2,"0")+"m" : m+"m"; }
+function upNextHTML(d,todayKey){
+  if(d.key!==todayKey) return "";
+  const now=Date.now();
+  const nx=d.items.find(it=>{ const st=startInstant(it); return st&&st.getTime()>now; });
+  if(!nx) return "";
+  const t=TYPES[nx.type]||TYPES.other;
+  return `<button class="upnext" data-act="gonext" data-id="${nx.id}"><span class="ue">${t.emoji}</span><span class="ut">${esc(nx.title||t.label)}</span><span class="uc">in ${durShort(startInstant(nx).getTime()-now)}</span></button>`;
+}
 function dayPage(d,idx,total,todayKey){
   const copyBtn = d.items.length? `<div class="copyday-wrap"><button class="btn ghost sm" data-act="copyDay" data-date="${d.key}">⧉ Copy day as text</button></div>` : "";
-  return `<div class="daypage" data-page="${idx}">${idx===0?countdownHTML(tripDays()):""}${dayTimelineHTML(d,todayKey)}${copyBtn}</div>`;
+  return `<div class="daypage" data-page="${idx}">${idx===0?countdownHTML(tripDays()):""}${upNextHTML(d,todayKey)}${dayTimelineHTML(d,todayKey)}${copyBtn}</div>`;
 }
 function tlRow(it,isLast){
   const t=TYPES[it.type]||TYPES.other; const sTz=startTz(it),eTz=endTz(it); const si=startInstant(it),ei=endInstant(it);
@@ -1150,7 +1184,7 @@ function tlRow(it,isLast){
   const expand = `<div class="tl-expand"${it.id===ui.expandedId?' style="max-height:none"':''}>
       ${whenHTML(it)}
       ${locsFull||""}
-      ${it.conf?`<div class="ref" style="margin-top:8px">Booking ref <span class="mono">${esc(it.conf)}</span> <button class="iconbtn" style="width:22px;height:22px;vertical-align:-5px" data-act="copy-conf" data-id="${it.id}">⧉</button></div>`:""}
+      ${it.conf?`<button class="refbtn" data-act="copy-conf" data-id="${it.id}" title="Tap to copy">Ref <span class="mono">${esc(it.conf)}</span> ⧉</button>`:""}
       ${it.notes?`<div class="note">${esc(it.notes)}</div>`:""}
       ${docs.length?`<div class="chiprow" style="margin-top:8px">${docs.map(d=>`<span class="chip doc" data-act="opendoc" data-url="${esc(d.url)}">📎 ${esc(d.title)}</span>`).join("")}</div>`:""}
       ${(it.files&&it.files.length)?`<div class="chiprow" style="margin-top:8px">${it.files.map(f=>`<a class="chip doc" href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name)}</a>`).join("")}</div>`:""}
@@ -1212,12 +1246,11 @@ function setupPager(days){
 function locLineHTML(it,loc,role){ if(!loc||(!loc.name&&!loc.address)) return "";
   const q=loc.lat!=null?`${loc.lat},${loc.lng}`:encodeURIComponent(loc.address||loc.name);
   const gmap=`https://www.google.com/maps/search/?api=1&query=${q}`;
-  return `<div class="loc"><span class="pin">📍</span><span><span style="font-weight:500">${esc(loc.name||"")}</span>${loc.name&&loc.address?"<br>":""}<span class="addr">${esc(loc.address||"")}</span>
-    <span class="loc-actions">
-      <button class="iconbtn" title="Copy address" data-act="copy-loc" data-id="${it.id}" data-role="${role}">⧉</button>
-      ${loc.lat!=null?`<button class="iconbtn" title="Show on map" data-act="focus" data-id="${it.id}">◎</button>`:""}
-      <a class="iconbtn" title="Open in Google Maps" href="${gmap}" target="_blank" rel="noopener">↗</a>
-    </span></span></div>`;
+  return `<div class="loc"><span class="pin">📍</span>
+    <button class="loc-txt" data-act="copy-loc" data-id="${it.id}" data-role="${role}" title="Tap to copy address">
+      <span class="nm">${esc(loc.name||"")}</span>${loc.name&&loc.address?"<br>":""}<span class="addr">${esc(loc.address||"")}</span>
+    </button>
+    <a class="locgo" href="${gmap}" target="_blank" rel="noopener" title="Open in Google Maps">↗</a></div>`;
 }
 function whenHTML(it){ const sTz=startTz(it),eTz=endTz(it); const si=startInstant(it),ei=endInstant(it);
   if(!si) return `<div class="when"><span style="color:var(--faint)">No date set</span></div>`;
@@ -1815,6 +1848,7 @@ document.addEventListener("click",e=>{
   switch(act){
     case "icsExport": downloadICS(); break;
     case "copyDay": { const d=tripDays().find(x=>x.key===a.dataset.date); if(d) copy(dayText(d)); break; }
+    case "gonext": { expandItem(id); setTimeout(()=>{ document.querySelector('.tl-card[data-card="'+cssEsc(id)+'"]')?.scrollIntoView({block:"center",behavior:"smooth"}); },120); break; }
     case "editEss": essModal(); break;
     case "copyEss": copy((state.meta.essentials||"").trim()); break;
     case "saveEss": { const v=$("#essText").value.trim(); state.meta.essentials=(v===ESS_TEMPLATE.trim()?"":v); save(); syncSet("meta",state.meta); closeModal(); renderMain(); toast("Essentials saved",true); break; }
@@ -1873,8 +1907,30 @@ $("#tripSub").addEventListener("input",e=>{ state.meta.sub=e.target.value; save(
 $("#fitBtn").addEventListener("click",()=>{ if(ui.view==="hotspots") refreshMap(); else applyMapFocus(null); });
 $("#satBtn").addEventListener("click",toggleSat);
 $("#meBtn")?.addEventListener("click",recenterMe);
-$("#fab")?.addEventListener("click",openCreateMenu);
+/* contextual ➕: tap = create what this tab is about; long-press = full menu */
+(function(){ const fab=$("#fab"); if(!fab) return; let lt=null, long=false;
+  fab.addEventListener("touchstart",()=>{ long=false; clearTimeout(lt); lt=setTimeout(()=>{ long=true; openCreateMenu(); },480); },{passive:true});
+  ["touchend","touchcancel","touchmove"].forEach(ev=>fab.addEventListener(ev,()=>clearTimeout(lt),{passive:true}));
+  fab.addEventListener("click",()=>{ if(long){ long=false; return; }
+    if(ui.view==="hotspots") hotspotModal(null);
+    else if(ui.view==="documents") docModal();
+    else itemModal(null); });
+})();
 $("#scrim").addEventListener("click",e=>{ if(e.target.id==="scrim") closeModal(); });
+/* drag a sheet/modal down (from its header zone) to dismiss */
+(function(){ const mo=$("#modal"); if(!mo) return; let sy=0,dragging=false,armed=false;
+  mo.addEventListener("touchstart",e=>{ armed=false; dragging=false; if(!isMobile()||e.touches.length!==1) return;
+    const y=e.touches[0].clientY, r=mo.getBoundingClientRect();
+    if(e.target.closest("input,textarea,select")) return;
+    armed = !!e.target.closest(".mh") || (y-r.top<44); sy=y; },{passive:true});
+  mo.addEventListener("touchmove",e=>{ if(!armed) return; const dy=e.touches[0].clientY-sy;
+    if(!dragging){ if(dy<8) return; dragging=true; mo.style.transition="none"; }
+    e.preventDefault(); mo.style.transform="translateY("+Math.max(0,dy)+"px)"; },{passive:false});
+  mo.addEventListener("touchend",e=>{ if(!dragging){ armed=false; return; } const dy=e.changedTouches[0].clientY-sy; dragging=false; armed=false;
+    mo.style.transition="transform .26s var(--ease)";
+    if(dy>110){ mo.style.transform="translateY(110%)"; setTimeout(()=>{ closeModal(); mo.style.transform=""; mo.style.transition=""; },230); }
+    else { mo.style.transform=""; setTimeout(()=>{ mo.style.transition=""; },280); } },{passive:true});
+})();
 let _rT; window.addEventListener("resize",()=>{ clearTimeout(_rT); _rT=setTimeout(()=>{ syncHeadH(); syncVVGap(); moveTabInd(); if(isMobile()&&sheetViews()) setSheet(sheet.state,false); if(map){ map.invalidateSize(); if(!isMobile()||ui.view==="map") refreshMap(); } },140); });
 matchMedia("(max-width:859px)").addEventListener?.("change",()=>{ if(!isMobile()&&ui.view==="map") setView("today"); else if(map) setTimeout(()=>{ map.invalidateSize(); refreshMap(); },90); });
 
