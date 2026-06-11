@@ -434,7 +434,13 @@
   .datebar.offday .gotoday{display:inline-flex; animation:gtpop .22s var(--ease)}
   .datebar.offday .datemain .dtz{display:none}
   .wx{flex:none; font-size:10.5px; font-weight:600; color:#3a5bd9; background:#edf2ff; padding:2px 8px; border-radius:20px; white-space:nowrap}
-  .copyday-wrap{display:flex; justify-content:center; margin-top:16px}
+  .copyday-wrap{display:flex; justify-content:center; margin-top:14px}
+  .qadd{display:flex; gap:8px; margin-top:18px}
+  .qadd-in{flex:1; min-width:0; border:1.5px dashed var(--line-strong); border-radius:13px; padding:11px 14px; font-size:16px; background:var(--bg); color:var(--ink)}
+  .qadd-in::placeholder{color:var(--faint)}
+  .qadd-in:focus{outline:none; border-style:solid; border-color:var(--accent); background:var(--card)}
+  .qadd-go{flex:none; width:46px; border-radius:13px; background:var(--accent); color:var(--ink); font-size:17px; font-weight:700}
+  .qadd-go:active{transform:scale(.94)}
   /* up-next banner (today only) */
   .upnext{display:flex; align-items:center; gap:9px; width:100%; text-align:left; background:var(--accent-soft); border:1.5px solid rgba(95,139,6,.25); border-radius:13px; padding:11px 14px; margin:2px 0 12px; font-size:14px}
   .upnext .ue{font-size:18px; flex:none}
@@ -617,7 +623,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r36";
+const APP_BUILD = "11 Jun 2026 · r37";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1167,7 +1173,8 @@ function upNextHTML(d,todayKey){
 }
 function dayPage(d,idx,total,todayKey){
   const copyBtn = d.items.length? `<div class="copyday-wrap"><button class="btn ghost sm" data-act="copyDay" data-date="${d.key}">⧉ Copy day as text</button></div>` : "";
-  return `<div class="daypage" data-page="${idx}">${idx===0?countdownHTML(tripDays()):""}${upNextHTML(d,todayKey)}${dayTimelineHTML(d,todayKey)}${copyBtn}</div>`;
+  const qadd=`<form class="qadd" data-date="${d.key}" autocomplete="off"><input class="qadd-in" type="text" enterkeyhint="done" placeholder="✨ Quick add — 19:30 dinner at Locavore"><button class="qadd-go" type="submit" aria-label="Add">↵</button></form>`;
+  return `<div class="daypage" data-page="${idx}">${idx===0?countdownHTML(tripDays()):""}${upNextHTML(d,todayKey)}${dayTimelineHTML(d,todayKey)}${qadd}${copyBtn}</div>`;
 }
 function tlRow(it,isLast){
   const t=TYPES[it.type]||TYPES.other; const sTz=startTz(it),eTz=endTz(it); const si=startInstant(it),ei=endInstant(it);
@@ -1175,7 +1182,7 @@ function tlRow(it,isLast){
   const cls = it._st==="now"?"now":it._st==="next"?"next":it._st==="past"?"dim":"";
   const badge = it._st==="now"?'<span class="stat now">Now</span>':it._st==="next"?'<span class="stat next">Up next</span>':"";
   const isLeg=(TYPES[it.type]||{}).legtoo && it.fromLoc;
-  let timeHtml = si?`${fmtTime(si,sTz)}<span class="z">${esc(tzAbbr(sTz))}</span>`:`–`;
+  let timeHtml = (si&&it.time)?`${fmtTime(si,sTz)}<span class="z">${esc(tzAbbr(sTz))}</span>`:`–`;
   const brief = isLeg ? `${esc(it.fromLoc?.name||"")} → ${esc(it.toLoc?.name||"")}`
     : (it.location&&(it.location.name||it.location.address)) ? esc(it.location.name||it.location.address) : "";
   const _dseen=new Set(); const docs=[...(it.docIds||[]).map(x=>state.docs.find(d=>d.id===x)), ...state.docs.filter(d=>d.itemId===it.id)].filter(d=>d&&!_dseen.has(d.id)&&_dseen.add(d.id));
@@ -1545,6 +1552,52 @@ function updateWxUI(days){
 }
 
 /* ====================== COPY DAY AS TEXT ====================== */
+/* ===== Magic quick-add: one line of text → a real item ===== */
+function inferType(s){ s=(s||"").toLowerCase();
+  if(/\b(flight|fly|boarding|[a-z]{2}\d{2,4}\b)/.test(s)) return "flight";
+  if(/\b(transfer|taxi|grab|gojek|pickup|pick-up|shuttle|driver|ferry|boat)\b/.test(s)) return "transfer";
+  if(/\b(hotel|check[- ]?in|check[- ]?out|villa|resort|stay|airbnb)\b/.test(s)) return "hotel";
+  if(/\b(dinner|lunch|breakfast|brunch|food|restaurant|cafe|coffee|drinks?|bar|eat|snack|warung)\b/.test(s)) return "food";
+  return "activity"; }
+function parseQuickAdd(raw){
+  let t=(raw||"").trim(); if(!t) return null;
+  let time="";
+  let m=t.match(/\b(\d{1,2})[:.](\d{2})\s*(am|pm)?\b/i);
+  if(!m) m=t.match(/\b(\d{1,2})\s*(am|pm)\b/i);
+  if(m){
+    let h=+m[1], mins=/^\d{2}$/.test(m[2]||"")?+m[2]:0;
+    const ap=((m[3]||((m[2]&&!/^\d/.test(m[2]))?m[2]:""))||"").toLowerCase();
+    if(ap==="pm"&&h<12)h+=12; if(ap==="am"&&h===12)h=0;
+    if(h<24&&mins<60){ time=String(h).padStart(2,"0")+":"+String(mins).padStart(2,"0"); t=(t.slice(0,m.index)+t.slice(m.index+m[0].length)).replace(/\s{2,}/g," ").trim(); }
+  }
+  const lm=t.match(/\s(?:at|@)\s+(.+)$/i); const locQuery=lm?lm[1].trim():"";
+  let title=t.replace(/^[-–·,\s]+|[-–·,\s]+$/g,"");
+  if(title) title=title[0].toUpperCase()+title.slice(1);
+  return {time, type:inferType(raw), title:title||"Plan", locQuery};
+}
+function quickAddSubmit(dateKey, raw){
+  const pq=parseQuickAdd(raw); if(!pq||!pq.title||pq.title==="Plan"&&!pq.time) { toast("Type something like: 19:30 dinner at Locavore"); return; }
+  const it={id:uid(), type:pq.type, title:pq.title, date:dateKey, time:pq.time, tz:state.meta.destTz, location:{}, docIds:[], files:[]};
+  state.items.push(it); save(); syncSet("items/"+it.id,it);
+  toast("✓ Added"+(pq.time?" · "+pq.time:"")+" · "+pq.title, true);
+  renderMain(); refreshMap();
+  if(pq.locQuery) quickAddEnrich(it.id, pq.locQuery);
+}
+async function quickAddEnrich(id, q){
+  const apply=loc=>{ const it=state.items.find(x=>x.id===id); if(!it||!loc||loc.lat==null) return; it.location=loc; save(); syncSet("items/"+id,it); refreshMap(); if(ui.view==="today") renderMain(); };
+  try{
+    if(googleReady && placesSvc()){
+      const opts={query:q}; try{ if(map){ opts.location=map.getCenter(); opts.radius=60000; } }catch(e){}
+      placesSvc().textSearch(opts,(arr,st)=>{ if(st===google.maps.places.PlacesServiceStatus.OK&&arr&&arr[0]){ const r=arr[0]; const g=r.geometry&&r.geometry.location; apply({name:r.name, address:r.formatted_address||"", lat:g?g.lat():null, lng:g?g.lng():null}); } });
+      return;
+    }
+    const resp=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(q)}`,{headers:{Accept:"application/json"}});
+    const arr=await resp.json();
+    if(arr&&arr[0]) apply({name:(arr[0].display_name||q).split(",")[0], address:arr[0].display_name||"", lat:+arr[0].lat, lng:+arr[0].lon});
+  }catch(e){}
+}
+document.addEventListener("submit",e=>{ const f=e.target.closest(".qadd"); if(!f) return; e.preventDefault(); const inp=f.querySelector("input"); if(inp&&inp.value.trim()){ quickAddSubmit(f.dataset.date, inp.value); } });
+
 function dayText(d){
   const lines=[`🌴 INDO 2026 — ${fmtDateFull(d.instant,d.tz)}`];
   if(!d.items.length) lines.push("Free day — nothing planned");
