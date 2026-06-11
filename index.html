@@ -438,6 +438,10 @@
   .more-toggle{width:100%; display:flex; align-items:center; gap:7px; padding:11px 13px; border:1.5px dashed var(--line-strong); border-radius:12px; color:var(--muted); font-weight:600; font-size:13.5px; margin:2px 0 10px; background:var(--bg)}
   .more-toggle .mchev{margin-left:auto; transition:transform .2s var(--ease)}
   #moreFold{animation:viewfade .22s var(--ease)}
+  .tl-card.done{opacity:.52}
+  .tl-card.done .t{text-decoration:line-through; text-decoration-thickness:1.5px; text-decoration-color:var(--accent-deep)}
+  .create-opt.danger{color:#c0392b}
+  .create-opt.danger:hover{border-color:#c0392b}
   .card-thumb{flex:none; width:42px; height:42px; border-radius:10px; background-size:cover; background-position:center; background-color:var(--bg); margin-left:6px}
   .metarow{display:flex; gap:6px; margin-top:7px; flex-wrap:wrap}
   .mbadge{font-size:11px; font-weight:600; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:2.5px 8px; color:var(--muted)}
@@ -637,7 +641,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r40";
+const APP_BUILD = "11 Jun 2026 · r41";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1187,7 +1191,7 @@ function durShort(ms){ const m=Math.max(1,Math.round(ms/60000)); const h=Math.fl
 function upNextHTML(d,todayKey){
   if(d.key!==todayKey) return "";
   const now=Date.now();
-  const nx=d.items.find(it=>{ const st=startInstant(it); return st&&st.getTime()>now; });
+  const nx=d.items.find(it=>{ if(it.done) return false; const st=startInstant(it); return st&&st.getTime()>now; });
   if(!nx) return "";
   const t=TYPES[nx.type]||TYPES.other;
   return `<button class="upnext" data-act="gonext" data-id="${nx.id}"><span class="ue">${t.emoji}</span><span class="ut">${esc(nx.title||t.label)}</span><span class="uc">in ${durShort(startInstant(nx).getTime()-now)}</span></button>`;
@@ -1231,7 +1235,7 @@ function tlRow(it,isLast){
   return {__item:true, html:`<div class="tl-row ${isLast?"last":""} ${it.id===ui.expandedId?'rowexp':''}">
     <div class="tl-time mono">${timeHtml}${ei&&isLeg?`<br>${fmtTime(ei,eTz)}<span class="z">${esc(tzAbbr(eTz))}</span>`:""}</div>
     <div class="tl-rail"><span class="tl-dot" style="--c:${color}"></span></div>
-    <div class="tl-card ${cls} ${it.id===ui.expandedId?'expanded':''}" data-card="${it.id}">
+    <div class="tl-card ${cls} ${it.done?"done":""} ${it.id===ui.expandedId?'expanded':''}" data-card="${it.id}">
       <div class="h"><span class="e">${t.emoji}</span><span class="t">${esc(it.title||t.label)}</span>${badge}${thumb}</div>
       ${brief?`<div class="loc-brief">📍 <span class="nm">${brief}</span></div>`:""}
       ${metaRow}
@@ -1585,6 +1589,24 @@ function updateWxUI(days){
 }
 
 /* ====================== COPY DAY AS TEXT ====================== */
+/* ===== Long-press card actions (edit / duplicate / done / delete) ===== */
+function openItemActions(id){ const it=state.items.find(x=>x.id===id); if(!it) return; const t=TYPES[it.type]||TYPES.other;
+  openModal(`<div class="mh"><h3>${t.emoji} ${esc(it.title||t.label)}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
+  <div class="mb"><div class="create-grid">
+    <button class="create-opt" data-act="edit" data-id="${id}"><span class="e">✎</span>Edit</button>
+    <button class="create-opt" data-act="dupItem" data-id="${id}"><span class="e">⧉</span>Duplicate to another day…</button>
+    <button class="create-opt" data-act="toggleDone" data-id="${id}"><span class="e">${it.done?"↺":"✓"}</span>${it.done?"Mark not done":"Mark done"}</button>
+    <button class="create-opt danger" data-act="delItem" data-id="${id}"><span class="e">🗑</span>Delete</button>
+  </div></div>`);
+}
+let _lpT=null; window._lpFired=false;
+document.addEventListener("touchstart",e=>{ clearTimeout(_lpT); const c=e.target.closest(".tl-card[data-card]"); if(!c||e.touches.length!==1) return;
+  const cid=c.dataset.card; window._lpFired=false;
+  _lpT=setTimeout(()=>{ window._lpFired=true; openItemActions(cid); setTimeout(()=>{ window._lpFired=false; },500); },480);
+},{passive:true});
+["touchmove","touchend","touchcancel"].forEach(ev=>document.addEventListener(ev,()=>clearTimeout(_lpT),{passive:true}));
+document.addEventListener("contextmenu",e=>{ const c=e.target.closest(".tl-card[data-card]"); if(!c) return; e.preventDefault(); openItemActions(c.dataset.card); });
+
 /* ===== Magic quick-add: one line of text → a real item ===== */
 function inferType(s){ s=(s||"").toLowerCase();
   if(/\b(flight|fly|boarding|[a-z]{2}\d{2,4}\b)/.test(s)) return "flight";
@@ -1641,7 +1663,7 @@ function dayText(d){
     let loc="";
     if(isLeg){ loc=[it.fromLoc&&(it.fromLoc.name||it.fromLoc.address), it.toLoc&&(it.toLoc.name||it.toLoc.address)].filter(Boolean).join(" → "); }
     else if(it.location){ loc=[it.location.name,it.location.address].filter(Boolean).join(", "); }
-    lines.push(`• ${time} ${t.emoji} ${it.title||t.label}${it.flightNo?` (${it.flightNo})`:""}${loc?` — ${loc}`:""}${it.conf?` · ref ${it.conf}`:""}`);
+    lines.push(`• ${it.done?"✅ ":""}${time} ${t.emoji} ${it.title||t.label}${it.flightNo?` (${it.flightNo})`:""}${loc?` — ${loc}`:""}${it.conf?` · ref ${it.conf}`:""}`);
   });
   return lines.join("\n");
 }
@@ -1942,7 +1964,7 @@ function loadExample(){ const ex=[
 document.addEventListener("click",e=>{
   const a=e.target.closest("[data-act]"); const card=e.target.closest("[data-card]");
   if(card&&!a){ if(e.target.closest("a")) return;
-    if(card.classList.contains("tl-card")) toggleItem(card.dataset.card);
+    if(card.classList.contains("tl-card")){ if(window._lpFired) return; toggleItem(card.dataset.card); }
     else focusItem(card.dataset.card);
     return; }
   const hs=e.target.closest("[data-hs]"); if(hs&&!a){ if(e.target.closest("a")) return; toggleHotspot(hs.dataset.hs); return; }
@@ -1976,6 +1998,21 @@ document.addEventListener("click",e=>{
     case "useLoc": startGeo(); break;
     case "rmPhoto": { const i=+a.dataset.i; if(draft&&draft.photos){ draft.photos.splice(i,1); const row=$("#hPhotos"); if(row) row.innerHTML=draft.photos.map((u,k)=>`<div class="hs-thumb" style="background-image:url('${esc(u)}')"><button class="hs-rm" data-act="rmPhoto" data-i="${k}">✕</button></div>`).join(""); } break; }
     case "rmFile": { const i=+a.dataset.i; if(draft&&draft.files){ draft.files.splice(i,1); renderItemFileChips(); } break; }
+    case "dupItem": { const it=state.items.find(x=>x.id===id); if(!it) break; const days=tripDays(); const t=TYPES[it.type]||TYPES.other;
+      openModal(`<div class="mh"><h3>⧉ Duplicate · ${esc(it.title||t.label)}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
+      <div class="mb"><div class="create-grid">
+        ${it.date?`<button class="create-opt" data-act="dupTo" data-id="${id}" data-date="${esc(it.date)}"><span class="e">📄</span>Same day</button>`:""}
+        ${days.map(d=>`<button class="create-opt" data-act="dupTo" data-id="${id}" data-date="${d.key}"><span class="e">📅</span>${esc(fmtDateFull(d.instant,d.tz))}</button>`).join("")}
+        <div style="display:flex;gap:8px;margin-top:4px"><input class="inp" type="date" id="dupDate" style="flex:1"><button class="btn lime sm" data-act="dupToCustom" data-id="${id}" style="align-self:stretch">Go</button></div>
+      </div></div>`); break; }
+    case "dupTo": case "dupToCustom": { const src=state.items.find(x=>x.id===id); if(!src) break;
+      const date = act==="dupToCustom" ? ($("#dupDate")?.value||"") : a.dataset.date;
+      if(!date){ toast("Pick a date first"); break; }
+      const cp=JSON.parse(JSON.stringify(src)); cp.id=uid(); delete cp.done;
+      if(src.date&&src.date2){ const delta=Math.round((new Date(date)-new Date(src.date))/86400000); const nd=new Date(src.date2+"T00:00:00Z"); nd.setUTCDate(nd.getUTCDate()+delta); cp.date2=nd.toISOString().slice(0,10); }
+      cp.date=date;
+      state.items.push(cp); save(); syncSet("items/"+cp.id,cp); closeModal(); renderMain(); refreshMap(); toast("⧉ Duplicated → "+date,true); break; }
+    case "toggleDone": { const it=state.items.find(x=>x.id===id); if(!it) break; it.done=!it.done; save(); syncSet("items/"+id,it); closeModal(); renderMain(); break; }
     case "hsToItin": { const h=(state.hotspots||[]).find(x=>x.id===id); if(!h) break;
       const mapT = h.type==="food" ? "food" : "activity";
       itemModal({id:uid(), type:mapT, title:h.name||"", date:"", time:"", tz:state.meta.destTz, location:JSON.parse(JSON.stringify(h.location||{})), hotspotId:h.id, docIds:[], files:[]});
