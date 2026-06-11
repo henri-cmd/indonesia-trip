@@ -596,7 +596,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r33";
+const APP_BUILD = "11 Jun 2026 · r34";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -951,7 +951,7 @@ function setSheet(name,animate=true){
   if(!isMobile()||!sheetViews()) return;
   sheet.state=name; try{ localStorage.setItem(SHEET_KEY,name); }catch(e){}
   applySheetTop(sheetSnapPx(name),animate);
-  const m=$("#main"); if(m) m.style.touchAction = name==="full" ? "pan-y" : "none";
+  const m=$("#main"); if(m) m.style.touchAction="pan-y"; // content always scrolls natively; the grip resizes the sheet
 }
 function bindSheetGestures(){
   const m=$("#main"); if(!m||m._sheet) return; m._sheet=true;
@@ -963,7 +963,9 @@ function bindSheetGestures(){
     sx=e.touches[0].clientX; sy=e.touches[0].clientY; lastY=sy; lastT=Date.now(); vel=0;
     const onGrip=!!t.closest(".sheet-grip,.datebar,.itinbar,.sec-head");
     if(!onGrip && t.closest("input,select,textarea,button,a,label")) return;
-    mode = onGrip ? "grip" : (sheet.state==="full" ? "pull" : "content");
+    // Content never drags the sheet — it scrolls natively (so the list is scrollable at
+    // half height with the map visible). Sheet moves via the grip row, or pull-down-at-top at full.
+    mode = onGrip ? "grip" : (sheet.state==="full" ? "pull" : null);
     startTop = sheetCurTop();
   },{passive:true});
   m.addEventListener("touchmove",e=>{
