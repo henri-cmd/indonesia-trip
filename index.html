@@ -435,6 +435,9 @@
   .datebar.offday .datemain .dtz{display:none}
   .wx{flex:none; font-size:10.5px; font-weight:600; color:#3a5bd9; background:#edf2ff; padding:2px 8px; border-radius:20px; white-space:nowrap}
   .copyday-wrap{display:flex; justify-content:center; margin-top:14px}
+  .more-toggle{width:100%; display:flex; align-items:center; gap:7px; padding:11px 13px; border:1.5px dashed var(--line-strong); border-radius:12px; color:var(--muted); font-weight:600; font-size:13.5px; margin:2px 0 10px; background:var(--bg)}
+  .more-toggle .mchev{margin-left:auto; transition:transform .2s var(--ease)}
+  #moreFold{animation:viewfade .22s var(--ease)}
   .qadd{display:flex; gap:8px; margin-top:18px}
   .qadd-in{flex:1; min-width:0; border:1.5px dashed var(--line-strong); border-radius:13px; padding:11px 14px; font-size:16px; background:var(--bg); color:var(--ink)}
   .qadd-in::placeholder{color:var(--faint)}
@@ -623,7 +626,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r37";
+const APP_BUILD = "11 Jun 2026 · r38";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1723,32 +1726,45 @@ let draft=null;
 function itemModal(item){
   draft=item?JSON.parse(JSON.stringify(item)):{id:uid(),type:"activity",title:"",date:"",time:"",tz:state.meta.destTz,location:{},docIds:[],files:[]};
   const isLeg=TYPES[draft.type]?.legtoo;
+  const moreOpen=!!(draft.tz2||draft.conf||draft.notes||(draft.files||[]).length||draft.flightNo||(!isLeg&&(draft.date2||draft.time2)));
   const typeBtns=Object.entries(TYPES).map(([k,t])=>`<button type="button" class="typebtn${draft.type===k?" on":""}" data-type="${k}"><span class="e">${t.emoji}</span>${t.label}</button>`).join("");
   openModal(`<div class="mh"><h3>${item?"Edit item":"Add to itinerary"}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
     <div class="mb">
       <div class="field"><label>Type</label><div class="typegrid" id="typeGrid">${typeBtns}</div></div>
-      <div class="field"><label>Title</label><input class="inp" id="f-title" value="${esc(draft.title)}" placeholder="${isLeg?"e.g. Flight QR1 LHR → DPS":"e.g. Check in · The Legian Seminyak"}"></div>
-      <div id="locBlock"></div>
+      <div class="field"><label>Title</label><input class="inp" id="f-title" value="${esc(draft.title)}" placeholder="${isLeg?"e.g. Flight QR1 LHR → DPS":"e.g. Snorkelling · Blue Lagoon"}"></div>
       <div class="row2"><div class="field"><label>${isLeg?"Departure date":"Date"}</label><input class="inp" type="date" id="f-date" value="${esc(draft.date||"")}"></div>
         <div class="field"><label>${isLeg?"Departure time":"Time"}</label><input class="inp" type="time" id="f-time" value="${esc(draft.time||"")}"></div></div>
-      <div class="row2"><div class="field"><label>${isLeg?"Departure zone":"Time zone"}</label><select class="inp" id="f-tz">${zoneOptions(draft.tz||state.meta.destTz)}</select></div>
-        <div class="field"><label>${isLeg?"Arrival zone":"End zone (optional)"}</label><select class="inp" id="f-tz2"><option value="">— same —</option>${COMMON_ZONES.map(z=>`<option value="${z.tz}"${draft.tz2===z.tz?" selected":""}>${esc(z.label)}</option>`).join("")}</select></div></div>
-      <div class="row2"><div class="field"><label>${isLeg?"Arrival date":"End date (optional)"}</label><input class="inp" type="date" id="f-date2" value="${esc(draft.date2||"")}"></div>
-        <div class="field"><label>${isLeg?"Arrival time":"End time (optional)"}</label><input class="inp" type="time" id="f-time2" value="${esc(draft.time2||"")}"></div></div>
-      ${draft.type==="flight"?`<div class="field"><label>Flight number (optional — enables live status)</label><input class="inp mono" id="f-flightno" value="${esc(draft.flightNo||"")}" placeholder="e.g. QR35"></div>`:""}
-      <div class="field"><label>Booking / confirmation ref (optional)</label><input class="inp mono" id="f-conf" value="${esc(draft.conf||"")}" placeholder="e.g. ABC123"></div>
-      <div class="field"><label>Notes (optional)</label><textarea class="inp" id="f-notes" placeholder="Anything useful — terminal, room type, what to bring…">${esc(draft.notes||"")}</textarea></div>
-      <div class="field"><label>Upload files (tickets, confirmations, PDFs…)</label>
-        <div class="chiprow" id="iFiles">${(draft.files||[]).map((f,i)=>`<span class="chip">📎 ${esc(f.name)} <button class="hs-rm" style="position:static;width:17px;height:17px;margin-left:3px" data-act="rmFile" data-i="${i}">✕</button></span>`).join("")}</div>
-        <label class="btn ghost sm" style="margin-top:8px;display:inline-flex">⬆ Upload file<input type="file" id="iFile" multiple style="display:none"></label>
-        <div class="hint" id="iUpStatus">${fstore?"Stored in your shared trip — they show inside the item and in Docs.":"File upload needs cloud sync."}</div>
+      ${isLeg?`<div class="row2"><div class="field"><label>Arrival date</label><input class="inp" type="date" id="f-date2" value="${esc(draft.date2||"")}"></div>
+        <div class="field"><label>Arrival time</label><input class="inp" type="time" id="f-time2" value="${esc(draft.time2||"")}"></div></div>`:""}
+      <div id="locBlock"></div>
+      <button type="button" class="more-toggle" data-act="toggleMore">⚙︎ More options <span class="mchev">▾</span></button>
+      <div id="moreFold" style="display:${moreOpen?"block":"none"}">
+        <div class="row2"><div class="field"><label>${isLeg?"Departure zone":"Time zone"}</label><select class="inp" id="f-tz">${zoneOptions(draft.tz||state.meta.destTz)}</select></div>
+          <div class="field"><label>${isLeg?"Arrival zone":"End zone (optional)"}</label><select class="inp" id="f-tz2"><option value="">— same —</option>${COMMON_ZONES.map(z=>`<option value="${z.tz}"${draft.tz2===z.tz?" selected":""}>${esc(z.label)}</option>`).join("")}</select></div></div>
+        ${!isLeg?`<div class="row2"><div class="field"><label>End date (optional)</label><input class="inp" type="date" id="f-date2" value="${esc(draft.date2||"")}"></div>
+          <div class="field"><label>End time (optional)</label><input class="inp" type="time" id="f-time2" value="${esc(draft.time2||"")}"></div></div>`:""}
+        ${draft.type==="flight"?`<div class="field"><label>Flight number (optional — enables live status)</label><input class="inp mono" id="f-flightno" value="${esc(draft.flightNo||"")}" placeholder="e.g. QR35"></div>`:""}
+        <div class="field"><label>Booking / confirmation ref (optional)</label><input class="inp mono" id="f-conf" value="${esc(draft.conf||"")}" placeholder="e.g. ABC123"></div>
+        <div class="field"><label>Notes (optional)</label><textarea class="inp" id="f-notes" placeholder="Anything useful — terminal, room type, what to bring…">${esc(draft.notes||"")}</textarea></div>
+        <div class="field"><label>Upload files (tickets, confirmations, PDFs…)</label>
+          <div class="chiprow" id="iFiles">${(draft.files||[]).map((f,i)=>`<span class="chip">📎 ${esc(f.name)} <button class="hs-rm" style="position:static;width:17px;height:17px;margin-left:3px" data-act="rmFile" data-i="${i}">✕</button></span>`).join("")}</div>
+          <label class="btn ghost sm" style="margin-top:8px;display:inline-flex">⬆ Upload file<input type="file" id="iFile" multiple style="display:none"></label>
+          <div class="hint" id="iUpStatus">${fstore?"Stored in your shared trip — they show inside the item and in Docs.":"File upload needs cloud sync."}</div>
+        </div>
       </div>
     </div>
     <div class="mf">${item?`<button class="btn danger" data-act="delItem" data-id="${draft.id}">Delete</button>`:""}
       <div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn lime" data-act="saveItem">${item?"Save":"Add to trip"}</button></div></div>`);
   renderLocBlock();
-  $("#typeGrid").addEventListener("click",e=>{ const b=e.target.closest(".typebtn"); if(!b)return; draft.type=b.dataset.type; collectItemForm(); itemModal(draft); });
+  $("#typeGrid").addEventListener("click",e=>{ const b=e.target.closest(".typebtn"); if(!b)return; draft._typeTouched=true; draft.type=b.dataset.type; collectItemForm(); itemModal(draft); });
   $("#iFile")?.addEventListener("change",e=>handleItemFiles(e.target.files));
+  /* live type inference from the title (until the user picks a type manually) */
+  const ti=$("#f-title");
+  ti.addEventListener("input",()=>{ if(draft._typeTouched) return; const ty=inferType(ti.value); if(!ty||ty===draft.type) return;
+    const sameShape = !!(TYPES[ty]&&TYPES[ty].legtoo) === !!(TYPES[draft.type]&&TYPES[draft.type].legtoo);
+    if(sameShape){ draft.type=ty; document.querySelectorAll("#typeGrid .typebtn").forEach(b=>b.classList.toggle("on",b.dataset.type===ty)); }
+    else draft._pendingType=ty; });
+  ti.addEventListener("blur",()=>{ if(draft._pendingType&&!draft._typeTouched){ draft.type=draft._pendingType; delete draft._pendingType; collectItemForm(); itemModal(draft); } });
 }
 function renderItemFileChips(){ const row=$("#iFiles"); if(row) row.innerHTML=(draft.files||[]).map((f,i)=>`<span class="chip">📎 ${esc(f.name)} <button class="hs-rm" style="position:static;width:17px;height:17px;margin-left:3px" data-act="rmFile" data-i="${i}">✕</button></span>`).join(""); }
 async function handleItemFiles(files){
@@ -1823,7 +1839,7 @@ function collectItemForm(){ if(!$("#f-title")) return;
   const grab=prefix=>{ const qEl=$("#"+prefix+"-q"); if(!qEl) return null; const picked=(draft._tmp&&draft._tmp[prefix])||{}; const name=qEl.value.trim(),addr=$("#"+prefix+"-addr").value.trim(); const o={name,address:addr}; if(picked.lat!=null){o.lat=picked.lat;o.lng=picked.lng;if(!o.name)o.name=picked.name;} return (o.name||o.address||o.lat!=null)?o:null; };
   if(TYPES[draft.type]?.legtoo){ draft.fromLoc=grab("from"); draft.toLoc=grab("to"); draft.location=null; } else { draft.location=grab("main"); draft.fromLoc=null; draft.toLoc=null; }
 }
-function saveItem(){ collectItemForm(); if(!draft.title){ toast("Give it a title first"); return; } delete draft._tmp;
+function saveItem(){ collectItemForm(); if(!draft.title){ toast("Give it a title first"); return; } delete draft._tmp; delete draft._typeTouched; delete draft._pendingType;
   const i=state.items.findIndex(x=>x.id===draft.id); if(i>=0) state.items[i]=draft; else state.items.push(draft);
   save(); syncSet("items/"+draft.id, draft); closeModal(); refreshMap(); renderMain(); toast("Saved",true); }
 function docModal(){
@@ -1905,6 +1921,7 @@ document.addEventListener("click",e=>{
     case "editEss": essModal(); break;
     case "copyEss": copy((state.meta.essentials||"").trim()); break;
     case "saveEss": { const v=$("#essText").value.trim(); state.meta.essentials=(v===ESS_TEMPLATE.trim()?"":v); save(); syncSet("meta",state.meta); closeModal(); renderMain(); toast("Essentials saved",true); break; }
+    case "toggleMore": { const f=$("#moreFold"); if(f){ const open=f.style.display!=="none"; f.style.display=open?"none":"block"; const ch=a.querySelector(".mchev"); if(ch) ch.style.transform=open?"":"rotate(180deg)"; } break; }
     case "itinDay": setItinMode("day"); break;
     case "itinAll": setItinMode("all"); break;
     case "add": itemModal(null); break;
