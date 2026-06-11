@@ -668,7 +668,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r52";
+const APP_BUILD = "11 Jun 2026 · r53";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1193,8 +1193,8 @@ function setItinMode(m){ if(m===ui.itinMode) return; ui.itinMode=m; localStorage
 function renderToday(){
   const days=tripDays();
   if(!days.length){
-    $("#main").innerHTML=`<div class="viewhead"><div class="vt">Today</div><div class="vs">Your day-by-day view</div></div>
-      <div class="empty"><div class="big">🌴</div><h3>No plans yet</h3><p>Add flights, hotels and activities and they’ll appear here day by day.</p>
+    $("#main").innerHTML=`<div class="sheet-grip"></div><div class="viewhead"><div class="vt">Trip itinerary</div><div class="vs">Your day-by-day plan</div></div>
+      <div class="empty"><div class="big">🌴</div><h3>No plans yet</h3><p>Add flights, stays and activities and they’ll appear here day by day.</p>
       <div class="cta"><button class="btn lime" data-act="add">＋ Add item</button><button class="btn ghost" data-act="addExample">Load a Bali example</button></div></div>`;
     return;
   }
