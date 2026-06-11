@@ -333,6 +333,7 @@
     .app.sheet-anim #main{transition:top .34s cubic-bezier(.3,1.02,.35,1)}
     body[data-view="today"] .pager{min-height:100%}
     .sheet-grip{position:sticky; top:0; z-index:7; display:none; justify-content:center; align-items:center; padding:10px 0 8px; background:var(--card); touch-action:none}
+    .sheet-grip::after{content:""; position:absolute; left:0; right:0; top:-6px; bottom:-14px} /* 44px-class hit zone — the handle is the only resize control */
     .sheet-grip::before{content:""; width:46px; height:5px; border-radius:3px; background:#c6c9b6}
     .sheet-grip:active::before{background:var(--accent)}
     body[data-view="today"] .sheet-grip, body[data-view="hotspots"] .sheet-grip{display:flex}
