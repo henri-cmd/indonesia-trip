@@ -435,6 +435,7 @@
   .datebar.offday .datemain .dtz{display:none}
   .wx{flex:none; font-size:10.5px; font-weight:600; color:#3a5bd9; background:#edf2ff; padding:2px 8px; border-radius:20px; white-space:nowrap}
   .copyday-wrap{display:flex; justify-content:center; margin-top:14px}
+  .paste-conf{width:100%; display:flex; align-items:center; gap:7px; padding:11px 13px; border:1.5px dashed rgba(95,139,6,.45); border-radius:12px; color:var(--accent-deep); font-weight:600; font-size:13px; margin-bottom:12px; background:var(--accent-soft); text-align:left}
   .more-toggle{width:100%; display:flex; align-items:center; gap:7px; padding:11px 13px; border:1.5px dashed var(--line-strong); border-radius:12px; color:var(--muted); font-weight:600; font-size:13.5px; margin:2px 0 10px; background:var(--bg)}
   .more-toggle .mchev{margin-left:auto; transition:transform .2s var(--ease)}
   #moreFold{animation:viewfade .22s var(--ease)}
@@ -641,7 +642,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r41";
+const APP_BUILD = "11 Jun 2026 · r42";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1589,6 +1590,34 @@ function updateWxUI(days){
 }
 
 /* ====================== COPY DAY AS TEXT ====================== */
+/* ===== Paste-anything: parse an airline confirmation blob ===== */
+function parseConfBlob(txt){
+  const out={}; const T=(txt||"").replace(/\u00a0/g," ");
+  const fm=T.match(/\b([A-Z]{2})\s?-?\s?(\d{2,4})\b(?![A-Z0-9])/); if(fm) out.flightNo=fm[1]+fm[2];
+  const rm=T.match(/(?:booking|confirmation|reservation)\s*(?:ref(?:erence)?|code|number|no\.?)?\s*[:#]?\s*([A-Z0-9]{5,8})\b/i)
+        || T.match(/\b(?:PNR|record locator)\s*[:#]?\s*([A-Z0-9]{5,8})\b/i);
+  if(rm) out.conf=rm[1].toUpperCase();
+  const times=[...T.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g)].map(m=>m[1].padStart(2,"0")+":"+m[2]);
+  if(times[0]) out.time=times[0]; if(times[1]) out.time2=times[1];
+  let d=T.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/); if(d) out.date=d[0];
+  if(!out.date){ d=T.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?,?\s*(20\d{2})?/i);
+    if(d){ const mi="janfebmaraprmayjunjulaugsepoctnovdec".indexOf(d[2].slice(0,3).toLowerCase())/3+1; const yr=d[3]||String(new Date().getFullYear());
+      out.date=`${yr}-${String(mi).padStart(2,"0")}-${String(+d[1]).padStart(2,"0")}`; } }
+  const noise=new Set(["THE","AND","FOR","NOT","ALL","PER","VIA","SUB","PDF","SMS","APP","WWW","COM","NET","ORG","JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC","MON","TUE","WED","THU","FRI","SAT","SUN","PNR","REF","GMT","UTC","EST","CET","KGS","BAG","ROW","GET","NEW","ONE","TWO","SIX","TEN","SEAT","ECO"]);
+  const codes=[...new Set([...T.matchAll(/\b[A-Z]{3}\b/g)].map(m=>m[0]).filter(c=>!noise.has(c)))];
+  if(codes.length>=2){ out.fromCode=codes[0]; out.toCode=codes[1]; }
+  if(out.date && out.time2 && /\+\s?1(\s?day)?\b/i.test(T)){ const nd=new Date(out.date+"T00:00:00Z"); nd.setUTCDate(nd.getUTCDate()+1); out.date2=nd.toISOString().slice(0,10); }
+  return out;
+}
+function resolveAirport(itemId, role, code){
+  const apply=loc=>{ const it=state.items.find(x=>x.id===itemId); if(!it||!loc) return; it[role]=loc; save(); syncSet("items/"+itemId,it); refreshMap(); if(ui.view==="today") renderMain(); };
+  if(googleReady && placesSvc()){
+    placesSvc().textSearch({query:code+" international airport"},(arr,st)=>{ if(st===google.maps.places.PlacesServiceStatus.OK&&arr&&arr[0]){ const r=arr[0]; const g=r.geometry&&r.geometry.location; apply({name:r.name, address:r.formatted_address||"", lat:g?g.lat():null, lng:g?g.lng():null}); } });
+  } else {
+    fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(code+" airport")}`,{headers:{Accept:"application/json"}}).then(r=>r.json()).then(arr=>{ if(arr&&arr[0]) apply({name:(arr[0].display_name||code).split(",")[0], address:arr[0].display_name||"", lat:+arr[0].lat, lng:+arr[0].lon}); }).catch(()=>{});
+  }
+}
+
 /* ===== Long-press card actions (edit / duplicate / done / delete) ===== */
 function openItemActions(id){ const it=state.items.find(x=>x.id===id); if(!it) return; const t=TYPES[it.type]||TYPES.other;
   openModal(`<div class="mh"><h3>${t.emoji} ${esc(it.title||t.label)}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
@@ -1786,6 +1815,7 @@ function itemModal(item){
   openModal(`<div class="mh"><h3>${isEdit?"Edit item":"Add to itinerary"}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
     <div class="mb">
       <div class="field"><label>Type</label><div class="typegrid" id="typeGrid">${typeBtns}</div></div>
+      ${draft.type==="flight"?`<button type="button" class="paste-conf" data-act="pasteConf">📋 Paste confirmation email — auto-fill flight details</button>`:""}
       <div class="field"><label>Title</label><input class="inp" id="f-title" value="${esc(draft.title)}" placeholder="${isLeg?"e.g. Flight QR1 LHR → DPS":"e.g. Snorkelling · Blue Lagoon"}"></div>
       <div class="row2"><div class="field"><label>${isLeg?"Departure date":"Date"}</label><input class="inp" type="date" id="f-date" value="${esc(draft.date||"")}"></div>
         <div class="field"><label>${isLeg?"Departure time":"Time"}</label><input class="inp" type="time" id="f-time" value="${esc(draft.time||"")}"></div></div>
@@ -1845,6 +1875,14 @@ function renderLocBlock(){ const isLeg=TYPES[draft.type]?.legtoo;
 /* ---- Google Places import (hotspots) ---- */
 let _placesSvc=null;
 function placesSvc(){ if(!_placesSvc && window.google && google.maps && google.maps.places){ try{ _placesSvc=new google.maps.places.PlacesService(document.createElement("div")); }catch(e){} } return _placesSvc; }
+async function reverseGeocode(c){
+  if(googleReady && window.google){ try{
+    const r=await new Promise(res=>{ new google.maps.Geocoder().geocode({location:{lat:c.lat,lng:c.lng}},(rs,st)=>{ res(st==="OK"&&rs&&rs[0]?rs[0]:null); }); });
+    if(r) return {name:(r.address_components&&r.address_components[0]&&r.address_components[0].long_name)||"", address:r.formatted_address||""};
+  }catch(e){} }
+  try{ const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${c.lat}&lon=${c.lng}`,{headers:{Accept:"application/json"}}); const j=await r.json();
+    return {name:(j.name||(j.display_name||"").split(",")[0]||""), address:j.display_name||""}; }catch(e){ return {name:"",address:""}; }
+}
 function placeNameFromUrl(u){ const m=u.match(/\/place\/([^\/@?]+)/); return m? decodeURIComponent(m[1].replace(/\+/g," ")).trim() : null; }
 function placesSearch(prefix){
   const raw=$("#"+prefix+"-q").value.trim(); const q=placeNameFromUrl(raw)||raw;
@@ -1874,7 +1912,7 @@ function enrichHotspotFromPlace(placeId){
 }
 function doGeocodeOSM(prefix){ doGeocode(prefix, true); }
 async function doGeocode(prefix, skipPlaces){ const q=$("#"+prefix+"-q").value.trim(); if(!q) return;
-  if(!skipPlaces && prefix==="hsloc" && googleReady && placesSvc() && !parseLatLng(q)){ placesSearch(prefix); return; }
+  if(!skipPlaces && googleReady && placesSvc() && !parseLatLng(q)){ placesSearch(prefix); return; }
   const coords=parseLatLng(q);
   if(coords){ setLoc(prefix,{name:"Locating…",address:"",lat:coords.lat,lng:coords.lng});
     reverseGeocode(coords).then(info=>setLoc(prefix,{name:info.name||"Pinned location",address:info.address||"",lat:coords.lat,lng:coords.lng}));
@@ -1895,9 +1933,10 @@ function collectItemForm(){ if(!$("#f-title")) return;
   const grab=prefix=>{ const qEl=$("#"+prefix+"-q"); if(!qEl) return null; const picked=(draft._tmp&&draft._tmp[prefix])||{}; const name=qEl.value.trim(),addr=$("#"+prefix+"-addr").value.trim(); const o={name,address:addr}; if(picked.lat!=null){o.lat=picked.lat;o.lng=picked.lng;if(!o.name)o.name=picked.name;} return (o.name||o.address||o.lat!=null)?o:null; };
   if(TYPES[draft.type]?.legtoo){ draft.fromLoc=grab("from"); draft.toLoc=grab("to"); draft.location=null; } else { draft.location=grab("main"); draft.fromLoc=null; draft.toLoc=null; }
 }
-function saveItem(){ collectItemForm(); if(!draft.title){ toast("Give it a title first"); return; } delete draft._tmp; delete draft._typeTouched; delete draft._pendingType;
+function saveItem(){ collectItemForm(); if(!draft.title){ toast("Give it a title first"); return; } const _air=draft._airports; delete draft._airports; delete draft._tmp; delete draft._typeTouched; delete draft._pendingType;
   const i=state.items.findIndex(x=>x.id===draft.id); if(i>=0) state.items[i]=draft; else state.items.push(draft);
-  save(); syncSet("items/"+draft.id, draft); closeModal(); refreshMap(); renderMain(); toast("Saved",true); }
+  save(); syncSet("items/"+draft.id, draft); closeModal(); refreshMap(); renderMain(); toast("Saved",true);
+  if(_air){ const id=draft.id; if(_air.from&&(!draft.fromLoc||draft.fromLoc.lat==null)) resolveAirport(id,"fromLoc",_air.from); if(_air.to&&(!draft.toLoc||draft.toLoc.lat==null)) resolveAirport(id,"toLoc",_air.to); } }
 function docModal(){
   draft={_dfiles:[]};
   const itemOpts=sortedItems().map(it=>{ const t=TYPES[it.type]||TYPES.other; return `<option value="${it.id}">${t.emoji} ${esc(it.title||t.label)}</option>`; }).join("");
@@ -1998,6 +2037,27 @@ document.addEventListener("click",e=>{
     case "useLoc": startGeo(); break;
     case "rmPhoto": { const i=+a.dataset.i; if(draft&&draft.photos){ draft.photos.splice(i,1); const row=$("#hPhotos"); if(row) row.innerHTML=draft.photos.map((u,k)=>`<div class="hs-thumb" style="background-image:url('${esc(u)}')"><button class="hs-rm" data-act="rmPhoto" data-i="${k}">✕</button></div>`).join(""); } break; }
     case "rmFile": { const i=+a.dataset.i; if(draft&&draft.files){ draft.files.splice(i,1); renderItemFileChips(); } break; }
+    case "pasteConf": { collectItemForm();
+      openModal(`<div class="mh"><h3>📋 Paste confirmation</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
+      <div class="mb"><div class="field"><label>Paste the airline email / booking text — I'll pull out the flight number, times, date, route and reference</label>
+      <textarea class="inp" id="confText" style="min-height:200px" placeholder="Paste anything…"></textarea></div></div>
+      <div class="mf"><div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn lime" data-act="applyConf">Auto-fill</button></div></div>`);
+      break; }
+    case "applyConf": { const out=parseConfBlob($("#confText").value);
+      if(!Object.keys(out).length){ toast("Couldn't find flight details in that"); break; }
+      draft.type="flight"; draft._typeTouched=true;
+      if(out.flightNo) draft.flightNo=out.flightNo;
+      if(out.conf) draft.conf=out.conf;
+      if(out.date) draft.date=out.date;
+      if(out.time) draft.time=out.time;
+      if(out.time2) draft.time2=out.time2;
+      if(out.date2) draft.date2=out.date2;
+      if(out.fromCode){ draft.fromLoc=draft.fromLoc&&draft.fromLoc.lat!=null?draft.fromLoc:{name:out.fromCode}; draft.toLoc=draft.toLoc&&draft.toLoc.lat!=null?draft.toLoc:{name:out.toCode};
+        draft._airports={from:out.fromCode,to:out.toCode}; }
+      if(!draft.title) draft.title="Flight"+(out.fromCode?` · ${out.fromCode} → ${out.toCode}`:"")+(out.flightNo?` (${out.flightNo})`:"");
+      itemModal(draft);
+      toast("✓ Filled from the confirmation — check & save",true);
+      break; }
     case "dupItem": { const it=state.items.find(x=>x.id===id); if(!it) break; const days=tripDays(); const t=TYPES[it.type]||TYPES.other;
       openModal(`<div class="mh"><h3>⧉ Duplicate · ${esc(it.title||t.label)}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
       <div class="mb"><div class="create-grid">
