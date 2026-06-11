@@ -451,6 +451,12 @@
   .durrow{display:flex; gap:7px; flex-wrap:wrap}
   .durchip{padding:9px 14px; border:1px solid var(--line); border-radius:11px; background:var(--card); font-size:13.5px; font-weight:600; color:var(--muted)}
   .durchip.on{background:var(--ink); color:#fff; border-color:var(--ink)}
+  .cont-card{flex:1; min-width:0; display:flex; align-items:center; gap:8px; border:1.5px dashed var(--line-strong); border-radius:13px; padding:12px 13px; background:var(--card); text-align:left; margin:4px 0}
+  .cont-card .ce{flex:none; font-size:16px}
+  .cont-card .ct{flex:1; min-width:0; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted)}
+  .cont-card .ct b{color:var(--ink)}
+  .cont-card:active{opacity:.7}
+  .zlbl{background:var(--bg) !important; color:var(--muted) !important; border:1px solid var(--line)}
   .ghost-sec{margin-top:16px}
   .ghost-h{font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); font-weight:700; margin:0 2px 7px}
   .ghost-card{width:100%; display:flex; align-items:center; gap:9px; padding:11px 13px; border:1.5px dashed var(--line-strong); border-radius:13px; background:var(--bg); opacity:.72; margin-top:7px; text-align:left}
@@ -653,7 +659,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r46";
+const APP_BUILD = "11 Jun 2026 · r47";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1116,6 +1122,9 @@ function tripDays(){
   const items=sortedItems().filter(i=>startInstant(i));
   const m=new Map();
   items.forEach(it=>{ const tz=startTz(it),k=itemDayKey(it); if(!m.has(k)) m.set(k,{key:k,instant:startInstant(it),tz,items:[]}); m.get(k).items.push(it); });
+  // days that only RECEIVE an arrival/check-out still exist (continuation rows render there)
+  items.forEach(it=>{ const ei=endInstant(it); if(!ei) return; const ek=dayKey(ei,endTz(it));
+    if(ek!==itemDayKey(it) && !m.has(ek)) m.set(ek,{key:ek,instant:ei,tz:endTz(it),items:[]}); });
   return [...m.values()].sort((a,b)=>a.key<b.key?-1:1);
 }
 function currentDayIndex(days){
@@ -1158,6 +1167,7 @@ function renderToday(){
           <span class="dbig" id="dbDate">${esc(fmtDateShort(cur.instant,cur.tz))}</span>
           <span class="chev">▾</span>
           <span class="dtz" id="dbSub">Day ${ui.dayIdx+1}/${days.length}</span>
+          <span class="dtz zlbl" id="dbZones">${esc(dayZonesLabel(cur))}</span>
           <span class="wx" id="dbWx" style="display:none"></span>
         </button>
         <button class="gotoday" data-act="goToday" title="Go to current day">⊙ Today</button>
@@ -1191,13 +1201,22 @@ function dayTimelineHTML(d,todayKey){
         if(gap>=60*60000) rows.push({html:`<div class="gaprow free"><span>✨ ${aE?"":"~"}${durShort(gap)} free</span></div>`}); }
     }
   });
+  // continuation rows: items that END on this day but started earlier (arrivals / check-outs)
+  const conts=sortedItems().filter(it=>{ const eiX=endInstant(it); if(!eiX) return false; return dayKey(eiX,endTz(it))===d.key && itemDayKey(it)!==d.key; })
+    .sort((a,b)=>endInstant(a)-endInstant(b));
+  conts.forEach(ct=>{ const eiX=endInstant(ct); const before=items.filter(x=>{ const sX=startInstant(x); return sX&&sX<=eiX; }).length;
+    let count=0,rowIdx=rows.length;
+    for(let rI=0;rI<rows.length;rI++){ if(rows[rI].__item){ if(count===before){rowIdx=rI;break;} count++; } }
+    const tC=TYPES[ct.type]||TYPES.other; const word = ct.type==="hotel"?"Check-out" : (ct.type==="flight"||ct.type==="transfer")?"Arrives":"Ends";
+    rows.splice(rowIdx,0,{html:`<div class="tl-row"><div class="tl-time mono">${fmtTime(eiX,endTz(ct))}<span class="z">${esc(tzAbbr(endTz(ct)))}</span></div><div class="tl-rail"><span class="tl-dot" style="--c:${TYPE_HEX[ct.type]||'#0e9aa0'}"></span></div><button class="cont-card" data-act="goItem" data-id="${ct.id}"><span class="ce">${tC.emoji}</span><span class="ct"><b>${word}</b> · ${esc(ct.title||tC.label)}</span><span class="garr">→</span></button></div>`});
+  });
   if(isToday){
     let insertAt=items.filter(it=>startInstant(it)?.getTime()<=now).length;
     let count=0,rowIdx=rows.length;
     for(let r=0;r<rows.length;r++){ if(rows[r].__item){ if(count===insertAt){rowIdx=r;break;} count++; } }
     rows.splice(rowIdx,0,{html:`<div class="nowline"><span class="lbl"><span class="pulse"></span>NOW ${fmtTime(new Date(),state.meta.destTz)}</span><span class="ln"></span></div>`});
   }
-  return items.length? `<div class="tl">${rows.map(r=>r.html).join("")}</div>` : `<div class="freeday">🌴 No plans — free day</div>`;
+  return (items.length||conts.length)? `<div class="tl">${rows.map(r=>r.html).join("")}</div>` : `<div class="freeday">🌴 No plans — free day</div>`;
 }
 function durShort(ms){ const m=Math.max(1,Math.round(ms/60000)); const h=Math.floor(m/60); return h? h+"h "+String(m%60).padStart(2,"0")+"m" : m+"m"; }
 function upNextHTML(d,todayKey){
@@ -1215,6 +1234,10 @@ function ghostRowsHTML(d){
   const g0=ghosts[0];
   return `<div class="ghost-sec"><div class="ghost-h">🌙 After midnight · ${esc(fmtDateShort(startInstant(g0),startTz(g0)))}</div>${ghosts.map(it=>{ const t=TYPES[it.type]||TYPES.other;
     return `<button class="ghost-card" data-act="goItem" data-id="${it.id}"><span class="gtime mono">${fmtTime(startInstant(it),startTz(it))}</span><span class="ge">${t.emoji}</span><span class="gt">${esc(it.title||t.label)}</span><span class="garr">→</span></button>`; }).join("")}</div>`;
+}
+function dayZonesLabel(d){
+  const seen=[]; (d.items||[]).forEach(it=>{ [startTz(it), endTz(it)].forEach(z=>{ if(!z) return; const ab=tzAbbr(z); if(!seen.includes(ab)) seen.push(ab); }); });
+  return seen.slice(0,3).join(" → ") || tzAbbr(d.tz);
 }
 function dayPage(d,idx,total,todayKey){
   const copyBtn = d.items.length? `<div class="copyday-wrap"><button class="btn ghost sm" data-act="copyDay" data-date="${d.key}">⧉ Copy day as text</button></div>` : "";
@@ -1273,6 +1296,7 @@ function tlLeg(lg){
     __leg:true, lg};
 }
 function updateDateBar(days,i){ const d=days[i]; if(!d) return; const D=$("#dbDate"),S=$("#dbSub"); if(D)D.textContent=fmtDateShort(d.instant,d.tz); if(S)S.textContent="Day "+(i+1)+"/"+days.length;
+  const Z=$("#dbZones"); if(Z) Z.textContent=dayZonesLabel(d);
   const W=$("#dbWx"); if(W){ if(!d._wxloc) assignWxLocs(days); const t=wxChip(d); W.textContent=t; W.style.display=t?"":"none"; }
   const db=$("#datebar"); if(db){ const tk=dayKey(new Date(),state.meta.destTz); db.classList.toggle("offday", days.some(x=>x.key===tk) && d.key!==tk); } }
 function setupPager(days){
@@ -1362,7 +1386,7 @@ function renderItinerary(){
     html+=countdownHTML(days);
     days.forEach(d=>{
       const isToday=d.key===todayKey;
-      html+=`<div class="daybar${isToday?" istoday":""}"><span class="d">${esc(fmtDateFull(d.instant,d.tz))}</span><span class="ln"></span><span class="wx" data-wxdate="${d.key}" style="display:none"></span><span class="dtz">${esc(tzAbbr(d.tz))}</span>${d.items.length?`<button class="iconbtn" data-act="copyDay" data-date="${d.key}" title="Copy day as text">⧉</button>`:""}</div>`;
+      html+=`<div class="daybar${isToday?" istoday":""}"><span class="d">${esc(fmtDateFull(d.instant,d.tz))}</span><span class="ln"></span><span class="wx" data-wxdate="${d.key}" style="display:none"></span><span class="dtz">${esc(dayZonesLabel(d))}</span>${d.items.length?`<button class="iconbtn" data-act="copyDay" data-date="${d.key}" title="Copy day as text">⧉</button>`:""}</div>`;
       html+=dayTimelineHTML(d,todayKey);
     });
   }
