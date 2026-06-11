@@ -657,7 +657,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "12 Jun 2026 · r59";
+const APP_BUILD = "12 Jun 2026 · r60";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1003,7 +1003,7 @@ function sheetSnapPx(name){ const a=sheetAppEl(); const H=a?a.clientHeight:600;
   return Math.round(H*0.34); } /* "half" = map ≈ one third, itinerary ≈ two thirds (Henri) */
 function sheetCurTop(){ const a=sheetAppEl(); const v=a&&a.style.getPropertyValue("--sheet-top"); return v?parseFloat(v):sheetSnapPx(sheet.state); }
 function applySheetTop(px,animate){ const a=sheetAppEl(); if(!a) return; a.classList.toggle("sheet-anim",!!animate); a.style.setProperty("--sheet-top", Math.round(px)+"px"); }
-function flyVisible(ll,z){ if(!map) return; z=Math.max(map.getZoom(), z||14); const pt=map.project(L.latLng(ll), z); pt.y += sheetCover()/2 - map.getSize().y*0.06; map.flyTo(map.unproject(pt,z), z, {duration:.5}); }
+function flyVisible(ll,z){ if(!map) return; z=Math.max(map.getZoom(), z||14); const pt=map.project(L.latLng(ll), z); pt.y += sheetCover()/2; map.flyTo(map.unproject(pt,z), z, {duration:.5}); }
 function sheetCover(){ if(!isMobile()||!sheetViews()) return 0; const a=sheetAppEl(); const H=a?a.clientHeight:0; return Math.max(0, H - sheetCurTop()); }
 function setSheet(name,animate=true){
   if(!isMobile()||!sheetViews()) return;
@@ -1453,7 +1453,7 @@ function startGeo(){
 function updateUserMarker(){ if(!map||!userLoc) return; const ll=[userLoc.lat,userLoc.lng];
   if(!userMarker){ userMarker=L.circleMarker(ll,{radius:7,weight:3,color:"#fff",fillColor:"#2f6fed",fillOpacity:1}).addTo(map); userMarker.bindPopup("📍 You are here"); }
   else userMarker.setLatLng(ll); }
-function recenterMe(){ if(!map) return; if(userLoc) map.flyTo([userLoc.lat,userLoc.lng], Math.max(map.getZoom(),14), {duration:.5}); else startGeo(); }
+function recenterMe(){ if(!map) return; if(userLoc) flyVisible([userLoc.lat,userLoc.lng], 14); else startGeo(); }
 function refLoc(){ return userLoc || {lat:-8.5,lng:115.2}; }
 /* "from you" nav estimate under the map */
 let fromMeReq=0;
