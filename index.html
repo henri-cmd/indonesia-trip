@@ -450,6 +450,7 @@
   .durrow{display:flex; gap:7px; flex-wrap:wrap}
   .durchip{padding:9px 14px; border:1px solid var(--line); border-radius:11px; background:var(--card); font-size:13.5px; font-weight:600; color:var(--muted)}
   .durchip.on{background:var(--ink); color:#fff; border-color:var(--ink)}
+  .talt{display:block; font-size:9.5px; color:var(--faint); margin-top:2px; white-space:nowrap; font-weight:500}
   .gaprow{display:flex; justify-content:center; padding:2px 0}
   .gaprow span{font-size:11.5px; font-weight:600; padding:3px 11px; border-radius:20px}
   .gaprow.free span{background:#f1f5e6; color:var(--accent-deep)}
@@ -642,7 +643,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r43";
+const APP_BUILD = "11 Jun 2026 · r44";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1209,6 +1210,7 @@ function tlRow(it,isLast){
   const badge = it._st==="now"?'<span class="stat now">Now</span>':it._st==="next"?'<span class="stat next">Up next</span>':"";
   const isLeg=(TYPES[it.type]||{}).legtoo && it.fromLoc;
   let timeHtml = (si&&it.time)?`${fmtTime(si,sTz)}<span class="z">${esc(tzAbbr(sTz))}</span>`:`–`;
+  if(si&&it.time&&sTz!==state.meta.destTz){ const plus=dayKey(si,state.meta.destTz)!==dayKey(si,sTz)?"⁺¹":""; timeHtml+=`<span class="talt">≈ ${fmtTime(si,state.meta.destTz)}${plus} ${esc(tzAbbr(state.meta.destTz))}</span>`; }
   const brief = isLeg ? `${esc(it.fromLoc?.name||"")} → ${esc(it.toLoc?.name||"")}`
     : (it.location&&(it.location.name||it.location.address)) ? esc(it.location.name||it.location.address) : "";
   const _dseen=new Set(); const docs=[...(it.docIds||[]).map(x=>state.docs.find(d=>d.id===x)), ...state.docs.filter(d=>d.itemId===it.id)].filter(d=>d&&!_dseen.has(d.id)&&_dseen.add(d.id));
