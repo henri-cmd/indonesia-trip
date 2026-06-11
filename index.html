@@ -679,7 +679,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r55";
+const APP_BUILD = "11 Jun 2026 · r56";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1751,9 +1751,9 @@ async function pdfText(f){
   for(let i=1;i<=nP;i++){ const pg=await doc.getPage(i); const tc=await pg.getTextContent(); out+=tc.items.map(x=>x.str).join(" ")+"\n"; }
   return out;
 }
-let importCtx={files:[],proposals:[],hintDate:""};
-function importModal(hintDate){
-  importCtx={files:[],proposals:[],hintDate:hintDate||""};
+let importCtx={files:[],proposals:[],hintDate:"",fill:false};
+function importModal(hintDate,fill){
+  importCtx={files:[],proposals:[],hintDate:hintDate||"",fill:!!fill};
   const hasKey=!!getAiKey();
   openModal(`<div class="mh"><h3>✨ Import from a document</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
   <div class="mb">
@@ -1766,7 +1766,7 @@ function importModal(hintDate){
     <div id="impStatus" class="hint"></div>
     <div id="impList"></div>
   </div>
-  <div class="mf"><div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn lime" id="impGo" data-act="impConfirm" style="display:none">Add selected</button></div></div>`);
+  <div class="mf"><div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="${fill?"impBackToItem":"closeModal"}">${fill?"← Back":"Cancel"}</button><button class="btn lime" id="impGo" data-act="impConfirm" style="display:none">Add selected</button></div></div>`);
   $("#impFile").addEventListener("change",e=>runImport([...e.target.files]));
   $("#impText").addEventListener("change",()=>{ const v=$("#impText").value.trim(); if(v) runImportText(v); });
 }
@@ -1808,10 +1808,13 @@ function localProposalFromText(txt){
 function showProposals(arr){
   importCtx.proposals=(arr||[]).filter(x=>x&&x.title);
   if(!importCtx.proposals.length){ impStatus("Nothing usable found in that document."); return; }
-  impStatus("Found "+importCtx.proposals.length+" — untick any you don't want:");
+  impStatus(importCtx.fill ? "Found "+importCtx.proposals.length+" — pick the one to fill the form with:" : "Found "+importCtx.proposals.length+" — untick any you don't want:");
   $("#impList").innerHTML=importCtx.proposals.map((pp,i)=>{ const fake={type:pp.type||"note",title:pp.title,notes:pp.notes||"",emoji:"",flightNo:pp.flightNo||""};
-    return `<label class="imp-row"><input type="checkbox" data-imp="${i}" checked><span class="ie">${flavorEmoji(fake)}</span><span class="it2"><b>${esc(pp.title)}</b><br><span class="addr">${esc([pp.date,pp.time,pp.place].filter(Boolean).join(" · ")||"no date — will need one")}</span></span></label>`; }).join("");
-  $("#impGo").style.display="";
+    const body=`<span class="ie">${flavorEmoji(fake)}</span><span class="it2"><b>${esc(pp.title)}</b><br><span class="addr">${esc([pp.date,pp.time,pp.place].filter(Boolean).join(" · ")||"no date — will need one")}</span></span>`;
+    return importCtx.fill
+      ? `<div class="imp-row">${body}<button class="btn lime sm" data-act="impUse" data-i="${i}" style="flex:none;align-self:center">Use</button></div>`
+      : `<label class="imp-row"><input type="checkbox" data-imp="${i}" checked>${body}</label>`; }).join("");
+  $("#impGo").style.display=importCtx.fill?"none":"";
 }
 async function importConfirm(){
   const picks=[...document.querySelectorAll('[data-imp]')].map((c,i)=>c.checked?importCtx.proposals[i]:null).filter(Boolean);
@@ -2071,7 +2074,7 @@ function itemModal(item){
     <div class="mb">
       <div class="field"><label>Type</label><div class="typegrid" id="typeGrid">${typeBtns}</div></div>
       ${(FLAVORS[draft.type]||[]).length>1?`<div class="field"><label>Icon <span class="hint" style="display:inline">— auto from the title, tap to override</span></label><div class="flavrow" id="flavRow"><button type="button" class="fchip${!draft.emoji?" on":""}" data-act="flavor" data-e="">✨ auto</button>${FLAVORS[draft.type].map(e=>`<button type="button" class="fchip${draft.emoji===e?" on":""}" data-act="flavor" data-e="${e}">${e}</button>`).join("")}</div></div>`:""}
-      ${draft.type==="travel"?`<button type="button" class="paste-conf" data-act="pasteConf">📋 Paste confirmation email — auto-fill flight details</button>`:""}
+      <button type="button" class="paste-conf" data-act="importFill">✨ Auto-fill from a ticket, booking or screenshot</button>
       <div class="field"><label>Title</label><input class="inp" id="f-title" value="${esc(draft.title)}" placeholder="${isLeg?"e.g. Flight QR1 LHR → DPS":"e.g. Snorkelling · Blue Lagoon"}"></div>
       <div class="row2"><div class="field"><label>${isLeg?"Departure date":"Date"}</label><input class="inp" type="date" id="f-date" value="${esc(draft.date||"")}"></div>
         <div class="field"><label>${isLeg?"Departure time":"Time"}</label><input class="inp" type="time" id="f-time" value="${esc(draft.time||"")}"></div></div>
@@ -2191,7 +2194,9 @@ function collectItemForm(){ if(!$("#f-title")) return;
 }
 function saveItem(){ collectItemForm(); if(!draft.title){ toast("Give it a title first"); return; } if(!draft.emoji) delete draft.emoji; const _air=draft._airports; delete draft._airports; delete draft._tmp; delete draft._typeTouched; delete draft._pendingType;
   const i=state.items.findIndex(x=>x.id===draft.id); if(i>=0) state.items[i]=draft; else state.items.push(draft);
+  const _pq=draft._placeQuery; delete draft._placeQuery;
   save(); syncSet("items/"+draft.id, draft); closeModal(); refreshMap(); renderMain(); toast("Saved",true);
+  if(_pq && (!draft.location||draft.location.lat==null)) quickAddEnrich(draft.id, _pq);
   if(_air){ const id=draft.id; if(_air.from&&(!draft.fromLoc||draft.fromLoc.lat==null)) resolveAirport(id,"fromLoc",_air.from); if(_air.to&&(!draft.toLoc||draft.toLoc.lat==null)) resolveAirport(id,"toLoc",_air.to); } }
 function guessDocCat(sG){ sG=(sG||"").toLowerCase();
   if(/board|e-?ticket|flight|airline|airways|garuda|airasia/.test(sG)) return "Flight";
@@ -2309,6 +2314,21 @@ document.addEventListener("click",e=>{
     case "rmPhoto": { const i=+a.dataset.i; if(draft&&draft.photos){ draft.photos.splice(i,1); const row=$("#hPhotos"); if(row) row.innerHTML=draft.photos.map((u,k)=>`<div class="hs-thumb" style="background-image:url('${esc(u)}')"><button class="hs-rm" data-act="rmPhoto" data-i="${k}">✕</button></div>`).join(""); } break; }
     case "rmFile": { const i=+a.dataset.i; if(draft&&draft.files){ draft.files.splice(i,1); renderItemFileChips(); } break; }
     case "importDoc": closeModal(); importModal(a.dataset.date||""); break;
+    case "importFill": collectItemForm(); importModal(draft.date||"", true); break;
+    case "impBackToItem": itemModal(draft); break;
+    case "impUse": { const pp=importCtx.proposals[+a.dataset.i]; if(!pp||!draft) break;
+      if(pp.type&&TYPES[pp.type]){ draft.type=pp.type; draft._typeTouched=true; }
+      if(pp.title) draft.title=String(pp.title).slice(0,90);
+      if(pp.date) draft.date=pp.date; if(pp.time) draft.time=pp.time;
+      if(pp.endDate) draft.date2=pp.endDate; if(pp.endTime) draft.time2=pp.endTime;
+      if(pp.flightNo) draft.flightNo=String(pp.flightNo).toUpperCase().replace(/\s+/g,"");
+      if(pp.ref) draft.conf=String(pp.ref); if(pp.notes&&!draft.notes) draft.notes=String(pp.notes);
+      if(pp.place&&(!draft.location||draft.location.lat==null)){ draft._tmp=draft._tmp||{}; /* geocode after save via airports? simpler: stash as location name for Places search */ draft.location={name:String(pp.place)}; draft._placeQuery=String(pp.place); }
+      const srcFiles=importCtx.files.slice();
+      itemModal(draft);
+      toast("✨ Filled — check & save"+(importCtx.proposals.length>1?" ("+(importCtx.proposals.length-1)+" more in 🎫 Import)":""),true);
+      if(srcFiles.length) setTimeout(()=>{ try{ handleItemFiles(srcFiles); }catch(e){} },150);
+      break; }
     case "qaExpand": { const w=a.closest(".addwrap"); if(!w) break; w.querySelector(".addbar").style.display="none"; const f=w.querySelector(".qadd"); f.classList.add("open"); setTimeout(()=>{ try{ f.querySelector("input").focus(); }catch(e){} },30); break; }
     case "impConfirm": importConfirm(); break;
     case "impPaste": { (async()=>{ try{
@@ -2318,27 +2338,6 @@ document.addEventListener("click",e=>{
         const tx=await (navigator.clipboard&&navigator.clipboard.readText?navigator.clipboard.readText():Promise.resolve(""));
         if(tx&&tx.trim()){ $("#impText").value=tx; runImportText(tx.trim()); } else impStatus("Clipboard is empty (or blocked) — use Choose file or paste into the text box.");
       }catch(e){ impStatus("Couldn't read the clipboard — paste into the text box instead."); } })(); break; }
-    case "pasteConf": { collectItemForm();
-      openModal(`<div class="mh"><h3>📋 Paste confirmation</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
-      <div class="mb"><div class="field"><label>Paste the airline email / booking text — I'll pull out the flight number, times, date, route and reference</label>
-      <textarea class="inp" id="confText" style="min-height:200px" placeholder="Paste anything…"></textarea></div></div>
-      <div class="mf"><div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn lime" data-act="applyConf">Auto-fill</button></div></div>`);
-      break; }
-    case "applyConf": { const out=parseConfBlob($("#confText").value);
-      if(!Object.keys(out).length){ toast("Couldn't find flight details in that"); break; }
-      draft.type="travel"; draft._typeTouched=true;
-      if(out.flightNo) draft.flightNo=out.flightNo;
-      if(out.conf) draft.conf=out.conf;
-      if(out.date) draft.date=out.date;
-      if(out.time) draft.time=out.time;
-      if(out.time2) draft.time2=out.time2;
-      if(out.date2) draft.date2=out.date2;
-      if(out.fromCode){ draft.fromLoc=draft.fromLoc&&draft.fromLoc.lat!=null?draft.fromLoc:{name:out.fromCode}; draft.toLoc=draft.toLoc&&draft.toLoc.lat!=null?draft.toLoc:{name:out.toCode};
-        draft._airports={from:out.fromCode,to:out.toCode}; }
-      if(!draft.title) draft.title="Flight"+(out.fromCode?` · ${out.fromCode} → ${out.toCode}`:"")+(out.flightNo?` (${out.flightNo})`:"");
-      itemModal(draft);
-      toast("✓ Filled from the confirmation — check & save",true);
-      break; }
     case "dupItem": { const it=state.items.find(x=>x.id===id); if(!it) break; const days=tripDays(); const t=TYPES[it.type]||TYPES.note;
       openModal(`<div class="mh"><h3>⧉ Duplicate · ${esc(it.title||t.label)}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
       <div class="mb"><div class="create-grid">
