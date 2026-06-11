@@ -481,7 +481,14 @@
   .gaprow span{font-size:11.5px; font-weight:600; padding:3px 11px; border-radius:20px}
   .gaprow.free span{background:#f1f5e6; color:var(--accent-deep)}
   .gaprow.warn span{background:#fdeceb; color:#c0392b; border:1px solid #f5c8c4}
-  .qadd{display:flex; gap:8px; margin-top:18px}
+  .addwrap{margin-top:18px}
+  .addbar{display:flex; gap:8px}
+  .addbar-q{flex:1; display:flex; align-items:center; gap:7px; padding:12px 14px; border:1.5px dashed var(--line-strong); border-radius:13px; background:var(--bg); color:var(--muted); font-size:14px; font-weight:600; text-align:left}
+  .addbar-q:active{border-color:var(--accent); color:var(--ink)}
+  .addbar-i{flex:none; display:flex; align-items:center; gap:6px; padding:12px 14px; border:1.5px dashed var(--line-strong); border-radius:13px; background:var(--bg); color:var(--muted); font-size:14px; font-weight:600}
+  .addbar-i:active{border-color:var(--accent); color:var(--ink)}
+  .qadd{display:none; gap:8px}
+  .qadd.open{display:flex; animation:viewfade .18s var(--ease)}
   .qadd-in{flex:1; min-width:0; border:1.5px dashed var(--line-strong); border-radius:13px; padding:11px 14px; font-size:16px; background:var(--bg); color:var(--ink)}
   .qadd-in::placeholder{color:var(--faint)}
   .qadd-in:focus{outline:none; border-style:solid; border-color:var(--accent); background:var(--card)}
@@ -672,7 +679,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r54";
+const APP_BUILD = "11 Jun 2026 · r55";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1291,8 +1298,13 @@ function dayZonesLabel(d){
 }
 function dayPage(d,idx,total,todayKey){
   const copyBtn = d.items.length? `<div class="copyday-wrap"><button class="btn ghost sm" data-act="copyDay" data-date="${d.key}">⧉ Copy day as text</button></div>` : "";
-  const qadd=`<form class="qadd" data-date="${d.key}" autocomplete="off"><input class="qadd-in" type="text" enterkeyhint="done" placeholder="✨ Quick add — 19:30 dinner at Locavore"><button class="qadd-go" type="submit" aria-label="Add">↵</button></form>
-  <div class="copyday-wrap" style="margin-top:10px"><button class="btn ghost sm" data-act="importDoc" data-date="${d.key}">✨ Import from ticket / booking</button></div>`;
+  const qadd=`<div class="addwrap">
+    <div class="addbar">
+      <button type="button" class="addbar-q" data-act="qaExpand" data-date="${d.key}">✨ Quick add</button>
+      <button type="button" class="addbar-i" data-act="importDoc" data-date="${d.key}">🎫 Import</button>
+    </div>
+    <form class="qadd" data-date="${d.key}" autocomplete="off"><input class="qadd-in" type="text" enterkeyhint="done" placeholder="19:30 dinner at Locavore"><button class="qadd-go" type="submit" aria-label="Add">↵</button></form>
+  </div>`;
   return `<div class="daypage" data-page="${idx}">${idx===0?countdownHTML(tripDays()):""}${upNextHTML(d,todayKey)}${dayTimelineHTML(d,todayKey)}${ghostRowsHTML(d)}${qadd}${copyBtn}</div>`;
 }
 function tlRow(it,isLast){
@@ -1874,8 +1886,10 @@ document.addEventListener("contextmenu",e=>{ const c=e.target.closest(".tl-card[
 /* ===== Magic quick-add: one line of text → a real item ===== */
 function inferType(s){ s=(s||"").toLowerCase();
   if(/\b(flight|fly|boarding|airport|ferry|boat|speedboat|train|bus|shuttle|taxi|grab|gojek|pickup|pick-up|drive|driver|transfer)\b/.test(s)||/\b[a-z]{2}\d{2,4}\b/.test(s)) return "travel";
-  if(/\b(hotel|check[- ]?in|check[- ]?out|villa|resort|stay|airbnb|camp)\b/.test(s)) return "stay";
   if(/\b(dinner|lunch|breakfast|brunch|food|restaurant|cafe|coffee|drinks?|bar|eat|snack|warung)\b/.test(s)) return "food";
+  /* strong activity words beat stay words — "spa at the villa" is an activity, not a stay */
+  if(/\b(spa|massage|yoga|snorkel|dive|diving|surf|temple|hike|trek|tour|class|lesson|show|beach day)\b/.test(s)) return "activity";
+  if(/\b(hotel|check[- ]?in|check[- ]?out|villa|resort|stay|airbnb|camp)\b/.test(s)) return "stay";
   return "activity"; }
 function parseQuickAdd(raw){
   let t=(raw||"").trim(); if(!t) return null;
@@ -1914,6 +1928,9 @@ async function quickAddEnrich(id, q){
     if(arr&&arr[0]) apply({name:(arr[0].display_name||q).split(",")[0], address:arr[0].display_name||"", lat:+arr[0].lat, lng:+arr[0].lon});
   }catch(e){}
 }
+document.addEventListener("focusout",e=>{ const inp=e.target&&e.target.classList&&e.target.classList.contains("qadd-in")?e.target:null; if(!inp) return;
+  setTimeout(()=>{ if(document.activeElement===inp) return; if(inp.value.trim()) return;
+    const w=inp.closest(".addwrap"); if(!w) return; w.querySelector(".qadd").classList.remove("open"); w.querySelector(".addbar").style.display=""; },140); });
 document.addEventListener("submit",e=>{ const f=e.target.closest(".qadd"); if(!f) return; e.preventDefault(); const inp=f.querySelector("input"); if(inp&&inp.value.trim()){ quickAddSubmit(f.dataset.date, inp.value); } });
 
 function dayText(d){
@@ -2292,6 +2309,7 @@ document.addEventListener("click",e=>{
     case "rmPhoto": { const i=+a.dataset.i; if(draft&&draft.photos){ draft.photos.splice(i,1); const row=$("#hPhotos"); if(row) row.innerHTML=draft.photos.map((u,k)=>`<div class="hs-thumb" style="background-image:url('${esc(u)}')"><button class="hs-rm" data-act="rmPhoto" data-i="${k}">✕</button></div>`).join(""); } break; }
     case "rmFile": { const i=+a.dataset.i; if(draft&&draft.files){ draft.files.splice(i,1); renderItemFileChips(); } break; }
     case "importDoc": closeModal(); importModal(a.dataset.date||""); break;
+    case "qaExpand": { const w=a.closest(".addwrap"); if(!w) break; w.querySelector(".addbar").style.display="none"; const f=w.querySelector(".qadd"); f.classList.add("open"); setTimeout(()=>{ try{ f.querySelector("input").focus(); }catch(e){} },30); break; }
     case "impConfirm": importConfirm(); break;
     case "impPaste": { (async()=>{ try{
         if(navigator.clipboard&&navigator.clipboard.read){ const cls=await navigator.clipboard.read();
