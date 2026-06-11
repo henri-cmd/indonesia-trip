@@ -438,6 +438,10 @@
   .more-toggle{width:100%; display:flex; align-items:center; gap:7px; padding:11px 13px; border:1.5px dashed var(--line-strong); border-radius:12px; color:var(--muted); font-weight:600; font-size:13.5px; margin:2px 0 10px; background:var(--bg)}
   .more-toggle .mchev{margin-left:auto; transition:transform .2s var(--ease)}
   #moreFold{animation:viewfade .22s var(--ease)}
+  .card-thumb{flex:none; width:42px; height:42px; border-radius:10px; background-size:cover; background-position:center; background-color:var(--bg); margin-left:6px}
+  .metarow{display:flex; gap:6px; margin-top:7px; flex-wrap:wrap}
+  .mbadge{font-size:11px; font-weight:600; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:2.5px 8px; color:var(--muted)}
+  .hs-linked{display:flex; width:100%; align-items:center; gap:6px; margin-top:10px; padding:10px 12px; border-radius:11px; background:var(--accent-soft); color:var(--accent-deep); font-size:13px; font-weight:600; text-align:left}
   .durrow{display:flex; gap:7px; flex-wrap:wrap}
   .durchip{padding:9px 14px; border:1px solid var(--line); border-radius:11px; background:var(--card); font-size:13.5px; font-weight:600; color:var(--muted)}
   .durchip.on{background:var(--ink); color:#fff; border-color:var(--ink)}
@@ -633,7 +637,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r39";
+const APP_BUILD = "11 Jun 2026 · r40";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1205,6 +1209,14 @@ function tlRow(it,isLast){
   const _dseen=new Set(); const docs=[...(it.docIds||[]).map(x=>state.docs.find(d=>d.id===x)), ...state.docs.filter(d=>d.itemId===it.id)].filter(d=>d&&!_dseen.has(d.id)&&_dseen.add(d.id));
   const locsFull = isLeg ? (locLineHTML(it,it.fromLoc,"from")+locLineHTML(it,it.toLoc,"to")) : locLineHTML(it,it.location,"main");
   const nb=nearbyHotspots(it);
+  const linkedH = it.hotspotId ? (state.hotspots||[]).find(h=>h.id===it.hotspotId) : null;
+  const metaBadges=[];
+  if(it.type==="flight"){ if(it.flightNo) metaBadges.push("✈ "+esc(it.flightNo)); if(si&&ei&&ei>si) metaBadges.push(durShort(ei-si)); }
+  else if(it.type==="hotel"){ if(it.date&&it.date2&&it.date2>it.date){ const nN=Math.max(1,Math.round((new Date(it.date2)-new Date(it.date))/86400000)); metaBadges.push("🛏 "+nN+" night"+(nN===1?"":"s")); } }
+  else if(si&&ei&&it.time&&it.time2&&ei>si) metaBadges.push("⏱ "+durShort(ei-si));
+  if(linkedH&&linkedH.rating) metaBadges.push("★ "+linkedH.rating);
+  const thumb = (linkedH&&linkedH.photos&&linkedH.photos[0]) ? `<span class="card-thumb" style="background-image:url('${esc(linkedH.photos[0])}')"></span>` : "";
+  const metaRow = metaBadges.length?`<div class="metarow">${metaBadges.map(b=>`<span class="mbadge">${b}</span>`).join("")}</div>`:"";
   const expand = `<div class="tl-expand"${it.id===ui.expandedId?' style="max-height:none"':''}>
       ${whenHTML(it)}
       ${locsFull||""}
@@ -1212,6 +1224,7 @@ function tlRow(it,isLast){
       ${it.notes?`<div class="note">${esc(it.notes)}</div>`:""}
       ${docs.length?`<div class="chiprow" style="margin-top:8px">${docs.map(d=>`<span class="chip doc" data-act="opendoc" data-url="${esc(d.url)}">📎 ${esc(d.title)}</span>`).join("")}</div>`:""}
       ${(it.files&&it.files.length)?`<div class="chiprow" style="margin-top:8px">${it.files.map(f=>`<a class="chip doc" href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name)}</a>`).join("")}</div>`:""}
+      ${linkedH?`<div class="chiprow" style="margin-top:9px"><button class="chip doc" data-act="goHotspot" data-id="${linkedH.id}">📍 ${esc(linkedH.name)} · view hotspot</button></div>`:""}
       ${nb.length?`<div class="nearby"><div class="nb-h">📍 Nearby hotspots</div>${nb.map(x=>`<button class="nb-row" data-act="goHotspot" data-id="${x.h.id}"><span>${(HOTSPOT_TYPES[x.h.type]||HOTSPOT_TYPES.other).emoji} ${esc(x.h.name)}</span><span class="nb-d">${distLabel(x.d)}</span></button>`).join("")}</div>`:""}
       <div style="margin-top:12px; display:flex; gap:7px; flex-wrap:wrap">${it.type==="flight"?`<a class="btn ghost sm" href="${flightStatusUrl(it)}" target="_blank" rel="noopener">✈️ Flight status</a>`:""}<button class="btn lime sm" data-act="edit" data-id="${it.id}">✎ Edit</button></div>
     </div>`;
@@ -1219,8 +1232,9 @@ function tlRow(it,isLast){
     <div class="tl-time mono">${timeHtml}${ei&&isLeg?`<br>${fmtTime(ei,eTz)}<span class="z">${esc(tzAbbr(eTz))}</span>`:""}</div>
     <div class="tl-rail"><span class="tl-dot" style="--c:${color}"></span></div>
     <div class="tl-card ${cls} ${it.id===ui.expandedId?'expanded':''}" data-card="${it.id}">
-      <div class="h"><span class="e">${t.emoji}</span><span class="t">${esc(it.title||t.label)}</span>${badge}</div>
+      <div class="h"><span class="e">${t.emoji}</span><span class="t">${esc(it.title||t.label)}</span>${badge}${thumb}</div>
       ${brief?`<div class="loc-brief">📍 <span class="nm">${brief}</span></div>`:""}
+      ${metaRow}
       ${expand}
     </div></div>`};
 }
@@ -1444,7 +1458,9 @@ function hotspotCard(h){
       ${h.url?`<div class="hs-link"><a href="${esc(/^https?:/.test(h.url)?h.url:'https://'+h.url)}" target="_blank" rel="noopener">🔗 ${esc(h.url.replace(/^https?:\/\//,'').slice(0,40))}</a></div>`:""}
       ${h.notes?`<div class="note">${esc(h.notes)}</div>`:""}
       ${(h.photos&&h.photos.length>1)?`<div class="hs-gallery">${h.photos.slice(1).map(u=>`<a class="hs-thumb" href="${esc(u)}" target="_blank" rel="noopener" style="background-image:url('${esc(u)}')"></a>`).join("")}</div>`:""}
+      ${(()=>{ const li=state.items.find(x=>x.hotspotId===h.id); return li?`<button class="hs-linked" data-act="goItem" data-id="${li.id}">📅 In your plan · ${esc(li.title||"item")}${li.date?` · ${esc(fmtDateShort(startInstant(li),startTz(li)))}`:""}</button>`:""; })()}
       <div class="hs-actions">
+        ${state.items.find(x=>x.hotspotId===h.id)?"":`<button class="btn lime sm" data-act="hsToItin" data-id="${h.id}">📅 Add to itinerary</button>`}
         <a class="btn ghost sm" href="${dir}" target="_blank" rel="noopener">🧭 Directions</a>
         <a class="btn ghost sm" href="${gmap}" target="_blank" rel="noopener">↗ Maps</a>
         ${(h.location?.lat!=null&&!isMobile())?`<button class="btn ghost sm" data-act="hsFocus" data-id="${h.id}">◎ Map</button>`:""}
@@ -1739,12 +1755,13 @@ function closeModal(){ $("#scrim").classList.remove("show"); $("#modal").innerHT
 let draft=null;
 function itemModal(item){
   draft=item?JSON.parse(JSON.stringify(item)):{id:uid(),type:"activity",title:"",date:"",time:"",tz:state.meta.destTz,location:{},docIds:[],files:[]};
+  const isEdit = !!(item && state.items.some(x=>x.id===item.id));
   const isLeg=TYPES[draft.type]?.legtoo;
   const moreOpen=!!(draft.tz2||draft.conf||draft.notes||(draft.files||[]).length||draft.flightNo||(!isLeg&&draft.date2&&draft.date2!==draft.date));
   let durSel=""; if(!isLeg&&draft.time&&draft.time2){ const [h1,m1]=draft.time.split(":").map(Number), [h2,m2]=draft.time2.split(":").map(Number);
     let mins=(h2*60+m2)-(h1*60+m1); if(draft.date2&&draft.date2!==draft.date) mins+=1440; if([30,60,90,120,180].includes(mins)) durSel=String(mins); else durSel="x"; }
   const typeBtns=Object.entries(TYPES).map(([k,t])=>`<button type="button" class="typebtn${draft.type===k?" on":""}" data-type="${k}"><span class="e">${t.emoji}</span>${t.label}</button>`).join("");
-  openModal(`<div class="mh"><h3>${item?"Edit item":"Add to itinerary"}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
+  openModal(`<div class="mh"><h3>${isEdit?"Edit item":"Add to itinerary"}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
     <div class="mb">
       <div class="field"><label>Type</label><div class="typegrid" id="typeGrid">${typeBtns}</div></div>
       <div class="field"><label>Title</label><input class="inp" id="f-title" value="${esc(draft.title)}" placeholder="${isLeg?"e.g. Flight QR1 LHR → DPS":"e.g. Snorkelling · Blue Lagoon"}"></div>
@@ -1770,8 +1787,8 @@ function itemModal(item){
         </div>
       </div>
     </div>
-    <div class="mf">${item?`<button class="btn danger" data-act="delItem" data-id="${draft.id}">Delete</button>`:""}
-      <div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn lime" data-act="saveItem">${item?"Save":"Add to trip"}</button></div></div>`);
+    <div class="mf">${isEdit?`<button class="btn danger" data-act="delItem" data-id="${draft.id}">Delete</button>`:""}
+      <div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn lime" data-act="saveItem">${isEdit?"Save":"Add to trip"}</button></div></div>`);
   renderLocBlock();
   $("#typeGrid").addEventListener("click",e=>{ const b=e.target.closest(".typebtn"); if(!b)return; draft._typeTouched=true; draft.type=b.dataset.type; collectItemForm(); itemModal(draft); });
   $("#iFile")?.addEventListener("change",e=>handleItemFiles(e.target.files));
@@ -1959,6 +1976,17 @@ document.addEventListener("click",e=>{
     case "useLoc": startGeo(); break;
     case "rmPhoto": { const i=+a.dataset.i; if(draft&&draft.photos){ draft.photos.splice(i,1); const row=$("#hPhotos"); if(row) row.innerHTML=draft.photos.map((u,k)=>`<div class="hs-thumb" style="background-image:url('${esc(u)}')"><button class="hs-rm" data-act="rmPhoto" data-i="${k}">✕</button></div>`).join(""); } break; }
     case "rmFile": { const i=+a.dataset.i; if(draft&&draft.files){ draft.files.splice(i,1); renderItemFileChips(); } break; }
+    case "hsToItin": { const h=(state.hotspots||[]).find(x=>x.id===id); if(!h) break;
+      const mapT = h.type==="food" ? "food" : "activity";
+      itemModal({id:uid(), type:mapT, title:h.name||"", date:"", time:"", tz:state.meta.destTz, location:JSON.parse(JSON.stringify(h.location||{})), hotspotId:h.id, docIds:[], files:[]});
+      break; }
+    case "goItem": { const it=state.items.find(x=>x.id===id); if(!it) break;
+      setView("today"); if(ui.itinMode!=="day") setItinMode("day");
+      setTimeout(()=>{ const days=pagerCtl?pagerCtl.days:tripDays(); const di=days.findIndex(d=>d.key===itemDayKey(it));
+        if(di>=0&&pagerCtl) pagerCtl.setTo(di,false);
+        expandItem(it.id);
+        setTimeout(()=>{ document.querySelector('.tl-card[data-card="'+cssEsc(it.id)+'"]')?.scrollIntoView({block:"center",behavior:"smooth"}); },160); },180);
+      break; }
     case "goHotspot": { setView("hotspots"); ui.expandedId=id; renderMain();
       setTimeout(()=>{ const el=document.querySelector('.hs-card[data-hs="'+cssEsc(id)+'"]'); el?.scrollIntoView({block:"center",behavior:"smooth"});
         const h=(state.hotspots||[]).find(x=>x.id===id); if(h&&h.location&&h.location.lat!=null&&map) flyVisible([h.location.lat,h.location.lng],14); },120);
