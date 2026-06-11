@@ -657,7 +657,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "12 Jun 2026 · r57";
+const APP_BUILD = "12 Jun 2026 · r58";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -990,7 +990,7 @@ function sheetAppEl(){ return document.querySelector(".app"); }
 function sheetSnapPx(name){ const a=sheetAppEl(); const H=a?a.clientHeight:600;
   if(name==="full") return 0;
   if(name==="down") return Math.max(0, H-46);
-  return Math.round(H*0.46); }
+  return Math.round(H*0.34); } /* "half" = map ≈ one third, itinerary ≈ two thirds (Henri) */
 function sheetCurTop(){ const a=sheetAppEl(); const v=a&&a.style.getPropertyValue("--sheet-top"); return v?parseFloat(v):sheetSnapPx(sheet.state); }
 function applySheetTop(px,animate){ const a=sheetAppEl(); if(!a) return; a.classList.toggle("sheet-anim",!!animate); a.style.setProperty("--sheet-top", Math.round(px)+"px"); }
 function flyVisible(ll,z){ if(!map) return; z=Math.max(map.getZoom(), z||14); const pt=map.project(L.latLng(ll), z); pt.y += sheetCover()/2 - map.getSize().y*0.06; map.flyTo(map.unproject(pt,z), z, {duration:.5}); }
