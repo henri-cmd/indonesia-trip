@@ -30,7 +30,7 @@
     --ease:cubic-bezier(.22,.7,.2,1);
   }
   *{box-sizing:border-box}
-  html,body{margin:0;padding:0}
+  html,body{margin:0;padding:0; overscroll-behavior-y:contain}
   /* iOS standalone (≤18): on an UNSCROLLABLE document iOS parks its short viewport at the
      top of the screen (dead strip at the bottom); on a scrollable one it bottom-anchors and
      the tab bar sits flush (verified on-device — Settings looked right, Today didn't).
@@ -321,7 +321,7 @@
        (header.top pads itself) — do NOT add the inset again here (it doubled the gap in the installed PWA) */
     body[data-view="today"] .app, body[data-view="hotspots"] .app{position:fixed; top:var(--head-h); bottom:calc(var(--bar-h) + var(--bar-pad) - var(--vv-gap,0px)); left:0; right:0; display:block; padding:0; --sheet-top:46%}
     body[data-view="today"] .mapwrap, body[data-view="hotspots"] .mapwrap{display:block; position:absolute; inset:0; overflow:hidden; border:none; border-radius:0; box-shadow:none}
-    body[data-view="today"] #main, body[data-view="hotspots"] #main{position:absolute; left:0; right:0; bottom:0; top:var(--sheet-top); min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 0 16px; touch-action:pan-y; background:var(--card); border-radius:18px 18px 0 0; box-shadow:0 -10px 34px rgba(20,22,15,.16); z-index:3}
+    body[data-view="today"] #main, body[data-view="hotspots"] #main{overscroll-behavior:contain; position:absolute; left:0; right:0; bottom:0; top:var(--sheet-top); min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 0 16px; touch-action:pan-y; background:var(--card); border-radius:18px 18px 0 0; box-shadow:0 -10px 34px rgba(20,22,15,.16); z-index:3}
     .app.sheet-anim #main{transition:top .34s cubic-bezier(.3,1.02,.35,1)}
     body[data-view="today"] .pager{min-height:100%}
     .sheet-grip{position:sticky; top:0; z-index:7; display:none; justify-content:center; align-items:center; padding:10px 0 8px; background:var(--card); touch-action:none}
@@ -657,7 +657,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "12 Jun 2026 · r58";
+const APP_BUILD = "12 Jun 2026 · r59";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -912,6 +912,16 @@ function focusItem(id){
 
 /* ---- tap-to-open detail view ---- */
 let detailMap=null;
+function cssEsc(s){ return (window.CSS&&CSS.escape)?CSS.escape(s):String(s).replace(/"/g,'\\"'); }
+function setCardExpanded(id,on){
+  const el=document.querySelector('.tl-card[data-card="'+cssEsc(id)+'"]'); if(!el) return;
+  el.classList.toggle('expanded',on);
+  const row=el.closest('.tl-row'); if(row) row.classList.toggle('rowexp',on);
+  const exp=el.querySelector('.tl-expand'); if(!exp) return;
+  if(on){ exp.style.maxHeight=exp.scrollHeight+'px'; clearTimeout(exp._t); exp._t=setTimeout(()=>{ if(el.classList.contains('expanded')) exp.style.maxHeight='none'; },360); }
+  else { exp.style.maxHeight=exp.scrollHeight+'px'; void exp.offsetHeight; exp.style.maxHeight='0px'; }
+}
+let _tapId=null,_tapT=0;
 function toggleItem(id){
   if(!id) return;
   const now=Date.now();
