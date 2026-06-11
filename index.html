@@ -332,11 +332,12 @@
     body[data-view="today"] #main, body[data-view="hotspots"] #main{position:absolute; left:0; right:0; bottom:0; top:var(--sheet-top); min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 0 16px; touch-action:pan-y; background:var(--card); border-radius:18px 18px 0 0; box-shadow:0 -10px 34px rgba(20,22,15,.16); z-index:3}
     .app.sheet-anim #main{transition:top .34s cubic-bezier(.3,1.02,.35,1)}
     body[data-view="today"] .pager{min-height:100%}
-    .sheet-grip{position:sticky; top:0; z-index:7; display:none; justify-content:center; padding:8px 0 3px; background:var(--card); touch-action:none}
-    .sheet-grip::before{content:""; width:40px; height:5px; border-radius:3px; background:var(--line-strong)}
+    .sheet-grip{position:sticky; top:0; z-index:7; display:none; justify-content:center; align-items:center; padding:10px 0 8px; background:var(--card); touch-action:none}
+    .sheet-grip::before{content:""; width:46px; height:5px; border-radius:3px; background:#c6c9b6}
+    .sheet-grip:active::before{background:var(--accent)}
     body[data-view="today"] .sheet-grip, body[data-view="hotspots"] .sheet-grip{display:flex}
-    body[data-view="today"] .todayhead{top:15px}
-    body[data-view="hotspots"] .sec-head, body[data-view="today"] .itinbar{position:sticky; top:15px; z-index:6; background:var(--card)}
+    body[data-view="today"] .todayhead{top:22px}
+    body[data-view="hotspots"] .sec-head, body[data-view="today"] .itinbar{position:sticky; top:22px; z-index:6; background:var(--card)}
     /* #map absolutely fills .mapwrap — it must never contribute to layout height,
        or the %-height feedback loop (map → mapwrap min-content → map) can explode */
     #map{position:absolute; inset:0; height:auto; min-height:0; border-radius:0}
@@ -596,7 +597,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r34";
+const APP_BUILD = "11 Jun 2026 · r35";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -961,11 +962,9 @@ function bindSheetGestures(){
     if(!isMobile()||!sheetViews()||e.touches.length!==1) return;
     const t=e.target;
     sx=e.touches[0].clientX; sy=e.touches[0].clientY; lastY=sy; lastT=Date.now(); vel=0;
-    const onGrip=!!t.closest(".sheet-grip,.datebar,.itinbar,.sec-head");
-    if(!onGrip && t.closest("input,select,textarea,button,a,label")) return;
-    // Content never drags the sheet — it scrolls natively (so the list is scrollable at
-    // half height with the map visible). Sheet moves via the grip row, or pull-down-at-top at full.
-    mode = onGrip ? "grip" : (sheet.state==="full" ? "pull" : null);
+    // THE HANDLE IS THE ONLY RESIZE CONTROL (Henri). Everything else — date row included —
+    // scrolls natively and never moves the sheet.
+    mode = t.closest(".sheet-grip") ? "grip" : null;
     startTop = sheetCurTop();
   },{passive:true});
   m.addEventListener("touchmove",e=>{
@@ -974,9 +973,7 @@ function bindSheetGestures(){
     const dx=x-sx, dy=y-sy;
     const now=Date.now(); vel=(y-lastY)/Math.max(1,now-lastT); lastY=y; lastT=now;
     if(!dragging){
-      if(window._pagerX){ mode=null; return; }                  // day-swipe owns this touch
-      if(Math.abs(dy)<10 || Math.abs(dy)<=Math.abs(dx)*1.2) return; // not a clear vertical yet
-      if(mode==="pull" && !(m.scrollTop<=0 && dy>0)){ mode=null; return; } // full + scrolled → native scroll
+      if(Math.abs(dy)<4 && Math.abs(dx)<4) return; // ignore micro-jitter, then commit to the drag
       dragging=true;
     }
     e.preventDefault();
