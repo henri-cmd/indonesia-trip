@@ -448,6 +448,12 @@
   .metarow{display:flex; gap:6px; margin-top:7px; flex-wrap:wrap}
   .mbadge{font-size:11px; font-weight:600; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:2.5px 8px; color:var(--muted)}
   .hs-linked{display:flex; width:100%; align-items:center; gap:6px; margin-top:10px; padding:10px 12px; border-radius:11px; background:var(--accent-soft); color:var(--accent-deep); font-size:13px; font-weight:600; text-align:left}
+  .filtrow{display:flex; gap:7px; flex-wrap:nowrap; overflow-x:auto; padding:9px 16px 4px; -webkit-overflow-scrolling:touch; scrollbar-width:none}
+  .filtrow::-webkit-scrollbar{display:none}
+  .fchip{flex:none; padding:7px 13px; border:1px solid var(--line); border-radius:20px; background:var(--card); font-size:13px; font-weight:600; color:var(--muted)}
+  .fchip.on{background:var(--ink); color:#fff; border-color:var(--ink)}
+  .flavrow{display:flex; gap:7px; flex-wrap:wrap}
+  .flavrow .fchip{font-size:15px; padding:7px 11px}
   .durrow{display:flex; gap:7px; flex-wrap:wrap}
   .durchip{padding:9px 14px; border:1px solid var(--line); border-radius:11px; background:var(--card); font-size:13.5px; font-weight:600; color:var(--muted)}
   .durchip.on{background:var(--ink); color:#fff; border-color:var(--ink)}
@@ -662,7 +668,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r51";
+const APP_BUILD = "11 Jun 2026 · r52";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -679,16 +685,44 @@ const COMMON_ZONES = [
   {tz:"Asia/Dubai",    abbr:"GST", label:"Dubai"},
   {tz:"Australia/Sydney",abbr:"AEST",label:"Sydney"},
 ];
+/* 5 GENERIC types (Henri, r52). Specific flavour (✈️/⛴/🚗, 🏖/💆/📸 …) comes from the
+   title via flavorEmoji(), with an optional per-item emoji override (it.emoji). */
 const TYPES = {
-  flight:  {emoji:"✈️", label:"Flight",   color:"var(--blue)",  legtoo:true},
-  hotel:   {emoji:"🏨", label:"Hotel",    color:"var(--violet)"},
-  transfer:{emoji:"🚗", label:"Transfer", color:"var(--amber)", legtoo:true},
-  activity:{emoji:"🎟️", label:"Activity", color:"var(--green)"},
-  food:    {emoji:"🍜", label:"Food",     color:"var(--red)"},
-  note:    {emoji:"📝", label:"Note",     color:"var(--grey)"},
-  other:   {emoji:"📍", label:"Other",    color:"var(--teal)"},
+  travel:  {emoji:"🧳", label:"Travel",  legtoo:true},
+  stay:    {emoji:"🏨", label:"Stay"},
+  activity:{emoji:"🎟️", label:"Activity"},
+  food:    {emoji:"🍜", label:"Food"},
+  note:    {emoji:"📝", label:"Note"},
 };
-const TYPE_HEX = {flight:"#2f6fed",hotel:"#7c5cf0",transfer:"#e08a00",activity:"#11936a",food:"#e0483d",note:"#7b8071",other:"#0e9aa0"};
+const TYPE_HEX = {travel:"#2f6fed",stay:"#7c5cf0",activity:"#11936a",food:"#e0483d",note:"#7b8071",
+  /* legacy aliases (pre-migration stragglers) */ flight:"#2f6fed",transfer:"#2f6fed",hotel:"#7c5cf0",other:"#7b8071"};
+const FLAVORS={travel:["✈️","⛴️","🚗","🚌","🚆","🛵"],stay:["🏨","🏡","⛺"],activity:["🎟️","📸","🏖️","💆","🥾","🤿","🎭","🛍️"],food:["🍜","☕","🍹","🍽️"],note:["📝"]};
+const LEGACY_TYPE={flight:"travel",transfer:"travel",hotel:"stay",other:"note"};
+function migrateTypes(st){ try{ (st.items||[]).forEach(it=>{ if(LEGACY_TYPE[it.type]){ if(it.type==="flight"&&!it.emoji) it.emoji="✈️"; it.type=LEGACY_TYPE[it.type]; } }); }catch(e){} return st; }
+function travelKind(it){ if(it&&it.emoji){ const m={"✈️":"flight","⛴️":"boat","⛴":"boat","🚆":"train","🚌":"bus","🛵":"scooter","🚗":"car"}; if(m[it.emoji]) return m[it.emoji]; }
+  const sK=(((it&&it.title)||"")+" "+((it&&it.notes)||"")).toLowerCase();
+  if((it&&it.flightNo)||/\b(flight|fly|boarding|airline)\b/.test(sK)||/\b[a-z]{2}\d{2,4}\b/.test(sK)) return "flight";
+  if(/\b(ferry|boat|speed ?boat|fast ?boat|catamaran|sail)\b/.test(sK)) return "boat";
+  if(/\btrain\b/.test(sK)) return "train";
+  if(/\b(bus|shuttle)\b/.test(sK)) return "bus";
+  if(/\b(scooter|moped)\b/.test(sK)) return "scooter";
+  return "car"; }
+function isFlight(it){ return !!it && (it.type==="travel"||it.type==="flight") && travelKind(it)==="flight"; }
+function flavorEmoji(it){ if(!it) return "📍"; if(it.emoji) return it.emoji;
+  const ty=it.type; const sF=((it.title||"")+" "+(it.notes||"")).toLowerCase();
+  if(ty==="travel"||ty==="flight"||ty==="transfer") return {flight:"✈️",boat:"⛴️",train:"🚆",bus:"🚌",scooter:"🛵",car:"🚗"}[travelKind(it)];
+  if(ty==="stay"||ty==="hotel"){ if(/\b(villa|airbnb|house|homestay)\b/.test(sF)) return "🏡"; if(/\b(camp|glamp|tent)\b/.test(sF)) return "⛺"; return "🏨"; }
+  if(ty==="food"){ if(/\b(coffee|cafe|brunch|breakfast)\b/.test(sF)) return "☕"; if(/\b(drinks?|bar|cocktails?|wine|beer)\b/.test(sF)) return "🍹"; return "🍜"; }
+  if(ty==="activity"||ty==="other"){
+    if(/\b(temple|sunrise|sunset|viewpoint|lookout|sight)\b/.test(sF)) return "📸";
+    if(/\bbeach\b/.test(sF)) return "🏖️";
+    if(/\b(spa|massage|yoga|wellness)\b/.test(sF)) return "💆";
+    if(/\b(hike|trek|climb|volcano|waterfall|rice terraces?)\b/.test(sF)) return "🥾";
+    if(/\b(snorkel|dive|diving|surf|swim)\b/.test(sF)) return "🤿";
+    if(/\b(show|dance|kecak|concert|theatre)\b/.test(sF)) return "🎭";
+    if(/\b(shop|market|mall)\b/.test(sF)) return "🛍️";
+    return "🎟️"; }
+  return (TYPES[ty]||TYPES.note).emoji; }
 const TZ_ABBR = {"Asia/Makassar":"WITA","Asia/Jakarta":"WIB","Asia/Jayapura":"WIT","Asia/Singapore":"SGT","Asia/Dubai":"GST","Australia/Sydney":"AEST"};
 
 let state = load();
@@ -711,7 +745,7 @@ let fdb=null, fauth=null, fstore=null, tripRef=null, tripId=null, syncStatus="of
 function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
 
 function blankState(){ return { meta:{ sub:"Henri & Elisa", homeTz:"Europe/London", destTz:"Asia/Makassar", driveUrl:"", mapsKey:"", clock:"24" }, items:[], docs:[], hotspots:[] }; }
-function load(){ try{ const s=JSON.parse(localStorage.getItem(STORE_KEY)); if(s&&s.meta) return s; }catch(e){} return blankState(); }
+function load(){ try{ const s=JSON.parse(localStorage.getItem(STORE_KEY)); if(s&&s.meta) return migrateTypes(s); }catch(e){} return blankState(); }
 function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
@@ -749,6 +783,7 @@ function onRemote(snap){
   state.items = v.items?Object.values(v.items):[];
   state.docs = v.docs?Object.values(v.docs):[];
   state.hotspots = v.hotspots?Object.values(v.hotspots):[];
+  migrateTypes(state);
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
   if($("#tripSub") && document.activeElement!==$("#tripSub") && state.meta.sub) $("#tripSub").value=state.meta.sub;
   renderClocks();
@@ -826,15 +861,15 @@ function toggleSat(){ satOn=!satOn;
   else { map.removeLayer(baseSat); map.removeLayer(satLabels); baseStd.addTo(map); }
   const b=$("#satBtn"); if(b){ const ic=b.querySelector(".mic"), lb=b.querySelector(".mlb"); if(ic) ic.textContent=satOn?"🗺":"🛰"; if(lb) lb.textContent=satOn?"Map":"Satellite"; }
 }
-function pinIcon(type,num){ const t=TYPES[type]||TYPES.other; const color=TYPE_HEX[type]||"#0e9aa0";
-  return L.divIcon({className:"",html:`<div class="epin" style="--c:${color}">${num?`<i class="pnum">${num}</i>`:""}<span>${t.emoji}</span></div>`,iconSize:[30,37],iconAnchor:[15,35],popupAnchor:[0,-32]}); }
+function pinIcon(it,num){ const color=TYPE_HEX[it.type]||"#0e9aa0";
+  return L.divIcon({className:"",html:`<div class="epin" style="--c:${color}">${num?`<i class="pnum">${num}</i>`:""}<span>${flavorEmoji(it)}</span></div>`,iconSize:[30,37],iconAnchor:[15,35],popupAnchor:[0,-32]}); }
 function refreshMap(){
   if(!map) return;
   if(ui.view==="hotspots"){ renderHotspotMarkers(); return; }
   markerLayer.clearLayers(); lineLayer.clearLayers(); markersById={};
   const allPts=[], emphPts=[], linePts=[], dayLine=[]; let n=0, dayN=0;
   sortedItems().forEach(it=>{
-    const t=TYPES[it.type]||TYPES.other; const inDay = !focusDayKey || itemDayKey(it)===focusDayKey;
+    const t=TYPES[it.type]||TYPES.note; const inDay = !focusDayKey || itemDayKey(it)===focusDayKey;
     const places=[];
     if(it.fromLoc&&it.fromLoc.lat!=null) places.push({loc:it.fromLoc,role:"from"});
     if(it.toLoc&&it.toLoc.lat!=null) places.push({loc:it.toLoc,role:"to"});
@@ -842,11 +877,11 @@ function refreshMap(){
     places.forEach(p=>{
       n++; const ll=[p.loc.lat,p.loc.lng]; linePts.push(ll);
       let pinNum=0; if(focusDayKey&&inDay){ dayN++; pinNum=dayN; dayLine.push(ll); }
-      const fitOk = !(it.type==="flight" && p.role==="from"); // don't let a far-flung departure airport drive the zoom
+      const fitOk = !(isFlight(it) && p.role==="from"); // don't let a far-flung departure airport drive the zoom
       if(fitOk){ allPts.push(ll); if(inDay) emphPts.push(ll); }
-      const m=L.marker(ll,{icon:pinIcon(it.type,pinNum),opacity:focusDayKey&&!inDay?0.35:1}).addTo(markerLayer);
+      const m=L.marker(ll,{icon:pinIcon(it,pinNum),opacity:focusDayKey&&!inDay?0.35:1}).addTo(markerLayer);
       const gmap=`https://www.google.com/maps/search/?api=1&query=${p.loc.lat},${p.loc.lng}`;
-      m.bindPopup(`<div class="pop"><div class="pt">${t.emoji} ${esc(it.title||t.label)}</div>`+
+      m.bindPopup(`<div class="pop"><div class="pt">${flavorEmoji(it)} ${esc(it.title||t.label)}</div>`+
         (p.loc.name?`<div class="pa">${esc(p.loc.name)}</div>`:"")+(p.loc.address?`<div class="pa">${esc(p.loc.address)}</div>`:"")+
         `<div class="pactions"><button onclick="copy('${esc((p.loc.address||p.loc.name||"").replace(/'/g,"\\'"))}')">⧉ Copy</button>`+
         `<a href="${gmap}" target="_blank" rel="noopener">↗ Maps</a></div></div>`,
@@ -859,7 +894,7 @@ function refreshMap(){
   const fitPts = (focusDayKey&&emphPts.length)?emphPts:allPts;
   if(fitPts.length && map.getSize().x>0){ try{ map.fitBounds(L.latLngBounds(fitPts).pad(.25),{maxZoom:14, paddingTopLeft:[16,14], paddingBottomRight:[16, sheetCover()+12]}); }catch(e){} }
   const used=[...new Set(state.items.map(i=>i.type))];
-  $("#legend").innerHTML=used.map(ty=>{const t=TYPES[ty]||TYPES.other;return `<span><i style="background:${TYPE_HEX[ty]||'#0e9aa0'}"></i>${t.label}</span>`;}).join("")||'<span style="color:var(--faint)">Add a stop to see it on the map</span>';
+  $("#legend").innerHTML=used.map(ty=>{const t=TYPES[ty]||TYPES.note;return `<span><i style="background:${TYPE_HEX[ty]||'#0e9aa0'}"></i>${t.label}</span>`;}).join("")||'<span style="color:var(--faint)">Add a stop to see it on the map</span>';
 }
 function applyMapFocus(key){ focusDayKey=key; refreshMap(); }
 function locsOf(it){ const pts=[]; [it&&it.fromLoc, it&&it.toLoc, it&&it.location].forEach(l=>{ if(l&&l.lat!=null) pts.push(L.latLng(l.lat,l.lng)); }); return pts; }
@@ -892,7 +927,7 @@ let detailMap=null;
 function openDetail(id){
   const it=state.items.find(x=>x.id===id) || (state.hotspots||[]).find(x=>x.id===id);
   if(!it) return;
-  const t=TYPES[it.type]||TYPES.other;
+  const t=TYPES[it.type]||TYPES.note;
   const _dseen=new Set(); const docs=[...(it.docIds||[]).map(x=>state.docs.find(d=>d.id===x)), ...state.docs.filter(d=>d.itemId===it.id)].filter(d=>d&&!_dseen.has(d.id)&&_dseen.add(d.id));
   const locsHtml=(it.fromLoc||it.toLoc)?(locLineHTML(it,it.fromLoc,"from")+locLineHTML(it,it.toLoc,"to")):locLineHTML(it,it.location,"main");
   $("#detailBody").innerHTML=`
@@ -1217,8 +1252,8 @@ function dayTimelineHTML(d,todayKey){
   conts.forEach(ct=>{ const eiX=endInstant(ct); const before=items.filter(x=>{ const sX=startInstant(x); return sX&&sX<=eiX; }).length;
     let count=0,rowIdx=rows.length;
     for(let rI=0;rI<rows.length;rI++){ if(rows[rI].__item){ if(count===before){rowIdx=rI;break;} count++; } }
-    const tC=TYPES[ct.type]||TYPES.other; const word = ct.type==="hotel"?"Check-out" : (ct.type==="flight"||ct.type==="transfer")?"Arrives":"Ends";
-    rows.splice(rowIdx,0,{html:`<div class="tl-row"><div class="tl-time mono">${fmtTime(eiX,endTz(ct))}<span class="z">${esc(tzAbbr(endTz(ct)))}</span></div><div class="tl-rail"><span class="tl-dot" style="--c:${TYPE_HEX[ct.type]||'#0e9aa0'}"></span></div><button class="cont-card" data-act="goItem" data-id="${ct.id}"><span class="ce">${tC.emoji}</span><span class="ct"><b>${word}</b> · ${esc(ct.title||tC.label)}</span><span class="garr">→</span></button></div>`});
+    const tC=TYPES[ct.type]||TYPES.note; const word = (ct.type==="stay"||ct.type==="hotel")?"Check-out" : (ct.type==="travel"||ct.type==="flight"||ct.type==="transfer")?"Arrives":"Ends";
+    rows.splice(rowIdx,0,{html:`<div class="tl-row"><div class="tl-time mono">${fmtTime(eiX,endTz(ct))}<span class="z">${esc(tzAbbr(endTz(ct)))}</span></div><div class="tl-rail"><span class="tl-dot" style="--c:${TYPE_HEX[ct.type]||'#0e9aa0'}"></span></div><button class="cont-card" data-act="goItem" data-id="${ct.id}"><span class="ce">${flavorEmoji(ct)}</span><span class="ct"><b>${word}</b> · ${esc(ct.title||tC.label)}</span><span class="garr">→</span></button></div>`});
   });
   if(isToday){
     let insertAt=items.filter(it=>startInstant(it)?.getTime()<=now).length;
@@ -1234,16 +1269,16 @@ function upNextHTML(d,todayKey){
   const now=Date.now();
   const nx=d.items.find(it=>{ if(it.done) return false; const st=startInstant(it); return st&&st.getTime()>now; });
   if(!nx) return "";
-  const t=TYPES[nx.type]||TYPES.other;
-  return `<button class="upnext" data-act="gonext" data-id="${nx.id}"><span class="ue">${t.emoji}</span><span class="ut">${esc(nx.title||t.label)}</span><span class="uc">in ${durShort(startInstant(nx).getTime()-now)}</span></button>`;
+  const t=TYPES[nx.type]||TYPES.note;
+  return `<button class="upnext" data-act="gonext" data-id="${nx.id}"><span class="ue">${flavorEmoji(nx)}</span><span class="ut">${esc(nx.title||t.label)}</span><span class="uc">in ${durShort(startInstant(nx).getTime()-now)}</span></button>`;
 }
 function ghostRowsHTML(d){
   const nk=(()=>{ const x=new Date(d.key+"T00:00:00Z"); x.setUTCDate(x.getUTCDate()+1); return x.toISOString().slice(0,10); })();
   const ghosts=sortedItems().filter(it=> itemDayKey(it)===nk && it.time && +it.time.split(":")[0]<3 );
   if(!ghosts.length) return "";
   const g0=ghosts[0];
-  return `<div class="ghost-sec"><div class="ghost-h">🌙 After midnight · ${esc(fmtDateShort(startInstant(g0),startTz(g0)))}</div>${ghosts.map(it=>{ const t=TYPES[it.type]||TYPES.other;
-    return `<button class="ghost-card" data-act="goItem" data-id="${it.id}"><span class="gtime mono">${fmtTime(startInstant(it),startTz(it))}</span><span class="ge">${t.emoji}</span><span class="gt">${esc(it.title||t.label)}</span><span class="garr">→</span></button>`; }).join("")}</div>`;
+  return `<div class="ghost-sec"><div class="ghost-h">🌙 After midnight · ${esc(fmtDateShort(startInstant(g0),startTz(g0)))}</div>${ghosts.map(it=>{ const t=TYPES[it.type]||TYPES.note;
+    return `<button class="ghost-card" data-act="goItem" data-id="${it.id}"><span class="gtime mono">${fmtTime(startInstant(it),startTz(it))}</span><span class="ge">${flavorEmoji(it)}</span><span class="gt">${esc(it.title||t.label)}</span><span class="garr">→</span></button>`; }).join("")}</div>`;
 }
 function dayZonesLabel(d){
   const seen=[]; (d.items||[]).forEach(it=>{ [startTz(it), endTz(it)].forEach(z=>{ if(!z) return; const ab=tzAbbr(z); if(!seen.includes(ab)) seen.push(ab); }); });
@@ -1255,7 +1290,7 @@ function dayPage(d,idx,total,todayKey){
   return `<div class="daypage" data-page="${idx}">${idx===0?countdownHTML(tripDays()):""}${upNextHTML(d,todayKey)}${dayTimelineHTML(d,todayKey)}${ghostRowsHTML(d)}${qadd}${copyBtn}</div>`;
 }
 function tlRow(it,isLast){
-  const t=TYPES[it.type]||TYPES.other; const sTz=startTz(it),eTz=endTz(it); const si=startInstant(it),ei=endInstant(it);
+  const t=TYPES[it.type]||TYPES.note; const sTz=startTz(it),eTz=endTz(it); const si=startInstant(it),ei=endInstant(it);
   const color=TYPE_HEX[it.type]||"#0e9aa0";
   const cls = it._st==="now"?"now":it._st==="next"?"next":it._st==="past"?"dim":"";
   const badge = it._st==="now"?'<span class="stat now">Now</span>':it._st==="next"?'<span class="stat next">Up next</span>':"";
@@ -1269,8 +1304,8 @@ function tlRow(it,isLast){
   const nb=nearbyHotspots(it);
   const linkedH = it.hotspotId ? (state.hotspots||[]).find(h=>h.id===it.hotspotId) : null;
   const metaBadges=[];
-  if(it.type==="flight"){ if(it.flightNo) metaBadges.push("✈ "+esc(it.flightNo)); if(si&&ei&&ei>si) metaBadges.push(durShort(ei-si)); }
-  else if(it.type==="hotel"){ if(it.date&&it.date2&&it.date2>it.date){ const nN=Math.max(1,Math.round((new Date(it.date2)-new Date(it.date))/86400000)); metaBadges.push("🛏 "+nN+" night"+(nN===1?"":"s")); } }
+  if(it.type==="travel"){ if(it.flightNo) metaBadges.push("✈ "+esc(it.flightNo)); if(si&&ei&&ei>si&&isLeg) metaBadges.push(durShort(ei-si)); }
+  else if(it.type==="stay"){ if(it.date&&it.date2&&it.date2>it.date){ const nN=Math.max(1,Math.round((new Date(it.date2)-new Date(it.date))/86400000)); metaBadges.push("🛏 "+nN+" night"+(nN===1?"":"s")); } }
   else if(si&&ei&&it.time&&it.time2&&ei>si) metaBadges.push("⏱ "+durShort(ei-si));
   if(linkedH&&linkedH.rating) metaBadges.push("★ "+linkedH.rating);
   const thumb = (linkedH&&linkedH.photos&&linkedH.photos[0]) ? `<span class="card-thumb" style="background-image:url('${esc(linkedH.photos[0])}')"></span>` : "";
@@ -1284,13 +1319,13 @@ function tlRow(it,isLast){
       ${(it.files&&it.files.length)?`<div class="chiprow" style="margin-top:8px">${it.files.map(f=>`<a class="chip doc" href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name)}</a>`).join("")}</div>`:""}
       ${linkedH?`<div class="chiprow" style="margin-top:9px"><button class="chip doc" data-act="goHotspot" data-id="${linkedH.id}">📍 ${esc(linkedH.name)} · view hotspot</button></div>`:""}
       ${nb.length?`<div class="nearby"><div class="nb-h">📍 Nearby hotspots</div>${nb.map(x=>`<button class="nb-row" data-act="goHotspot" data-id="${x.h.id}"><span>${(HOTSPOT_TYPES[x.h.type]||HOTSPOT_TYPES.other).emoji} ${esc(x.h.name)}</span><span class="nb-d">${distLabel(x.d)}</span></button>`).join("")}</div>`:""}
-      <div style="margin-top:12px; display:flex; gap:7px; flex-wrap:wrap">${it.type==="flight"?`<a class="btn ghost sm" href="${flightStatusUrl(it)}" target="_blank" rel="noopener">✈️ Flight status</a>`:""}<button class="btn lime sm" data-act="edit" data-id="${it.id}">✎ Edit</button></div>
+      <div style="margin-top:12px; display:flex; gap:7px; flex-wrap:wrap">${isFlight(it)?`<a class="btn ghost sm" href="${flightStatusUrl(it)}" target="_blank" rel="noopener">✈️ Flight status</a>`:""}<button class="btn lime sm" data-act="edit" data-id="${it.id}">✎ Edit</button></div>
     </div>`;
   return {__item:true, html:`<div class="tl-row ${isLast?"last":""} ${it.id===ui.expandedId?'rowexp':''}">
     <div class="tl-time mono">${timeHtml}${ei&&isLeg?`<br>${fmtTime(ei,eTz)}${(()=>{ const dd=it.date&&it.date2?Math.round((new Date(it.date2)-new Date(it.date))/86400000):0; return dd!==0?`<sup class="plusd">${dd>0?"+":"\u2212"}${Math.abs(dd)}</sup>`:""; })()}<span class="z">${esc(tzAbbr(eTz))}</span>`:""}</div>
     <div class="tl-rail"><span class="tl-dot" style="--c:${color}"></span></div>
     <div class="tl-card ${cls} ${it.done?"done":""} ${it.id===ui.expandedId?'expanded':''}" data-card="${it.id}">
-      <div class="h"><span class="e">${t.emoji}</span><span class="t">${esc(it.title||t.label)}</span>${badge}${thumb}</div>
+      <div class="h"><span class="e">${flavorEmoji(it)}</span><span class="t">${esc(it.title||t.label)}</span>${badge}${thumb}</div>
       ${brief?`<div class="loc-brief">📍 <span class="nm">${brief}</span></div>`:""}
       ${metaRow}
       ${expand}
@@ -1361,7 +1396,7 @@ function whenHTML(it){ const sTz=startTz(it),eTz=endTz(it); const si=startInstan
   let endStr=""; if(ei){ const sameDay=dayKey(si,sTz)===dayKey(ei,eTz); endStr=sameDay?" – "+fmtTime(ei,eTz):" → "+fmtDateShort(ei,eTz)+" "+fmtTime(ei,eTz); }
   return `<div class="when"><span class="time mono">${fmtTime(si,sTz)}${endStr}</span><span class="tz">${esc(tzAbbr(sTz))}</span>${homeEq}</div>`;
 }
-function itemCard(it){ const t=TYPES[it.type]||TYPES.other; const docs=(it.docIds||[]).map(id=>state.docs.find(d=>d.id===id)).filter(Boolean); const sel=ui.selId===it.id?" sel":"";
+function itemCard(it){ const t=TYPES[it.type]||TYPES.note; const docs=(it.docIds||[]).map(id=>state.docs.find(d=>d.id===id)).filter(Boolean); const sel=ui.selId===it.id?" sel":"";
   let locs = (it.fromLoc||it.toLoc)?(locLineHTML(it,it.fromLoc,"from")+locLineHTML(it,it.toLoc,"to")):locLineHTML(it,it.location,"main");
   return `<div class="card${sel}" data-card="${it.id}">
     <div class="ic">${t.emoji}</div>
@@ -1430,21 +1465,25 @@ const DOC_ICON={Flight:"✈️",Hotel:"🏨",Transfer:"🚗",Insurance:"🛡️"
 function docChipHTML(d){ return `<span class="chip doc dchip"><a href="${esc(d.url)}" target="_blank" rel="noopener">${d.file?"📎":"🔗"} ${esc(d.title)}</a><button class="hs-rm" style="position:static;width:17px;height:17px;margin-left:4px" data-act="delDoc" data-id="${d.id}">✕</button></span>`; }
 function renderDocuments(){
   let html=`<div class="sec-head"><h2>Documents</h2><div class="sp"></div>
-    <button class="btn lime" data-act="addDoc">＋ Add document</button></div><div class="doc-body">`;
+    <button class="btn lime" data-act="addDoc">＋ Add document</button></div>${chips}<div class="doc-body">`;
+  const catSet=[...new Set(state.docs.map(x=>x.cat||"Other"))];
+  const filt=ui.docFilter||"";
+  const chips = state.docs.length? `<div class="filtrow">${[["","All"],...DOC_CATS.filter(c=>catSet.includes(c)).map(c=>[c,(DOC_ICON[c]||"")+" "+c])].map(([k,lab])=>`<button class="fchip${filt===k?" on":""}" data-act="docFilter" data-k="${esc(k)}">${lab}</button>`).join("")}</div>` : "";
   const ess=(state.meta.essentials||"").trim();
   if(ess){
     html+=`<div class="esscard"><div class="ess-h">🆘 Essentials <button class="iconbtn" data-act="editEss" title="Edit">✎</button><button class="iconbtn" data-act="copyEss" title="Copy all">⧉</button></div><div class="ess-b">${esc(ess)}</div></div>`;
   } else {
     html+=`<button class="ess-add" data-act="editEss">🆘 Add essentials — insurance policy, embassy, emergency numbers…</button>`;
   }
-  const itemDocs={}; state.docs.forEach(d=>{ if(d.itemId) (itemDocs[d.itemId]=itemDocs[d.itemId]||[]).push(d); });
-  const withFiles=sortedItems().filter(i=>(i.files&&i.files.length)||(itemDocs[i.id]&&itemDocs[i.id].length));
-  const general=state.docs.filter(d=>!d.itemId);
+  const fdocs=filt? state.docs.filter(x=>(x.cat||"Other")===filt) : state.docs;
+  const itemDocs={}; fdocs.forEach(d=>{ if(d.itemId) (itemDocs[d.itemId]=itemDocs[d.itemId]||[]).push(d); });
+  const withFiles=sortedItems().filter(i=>((!filt&&i.files&&i.files.length))||(itemDocs[i.id]&&itemDocs[i.id].length));
+  const general=fdocs.filter(d=>!d.itemId);
   if(withFiles.length){
-    html+=`<div class="sec-sub">📂 By itinerary item</div>`+withFiles.map(it=>{ const t=TYPES[it.type]||TYPES.other;
-      const chips=[ ...(it.files||[]).map(f=>`<a class="chip doc" href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name)}</a>`),
+    html+=`<div class="sec-sub">📂 By itinerary item</div>`+withFiles.map(it=>{ const t=TYPES[it.type]||TYPES.note;
+      const chips=[ ...((filt?[]:(it.files||[]))).map(f=>`<a class="chip doc" href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name)}</a>`),
                     ...((itemDocs[it.id]||[]).map(docChipHTML)) ].join("");
-      return `<div class="itdoc"><div class="itdoc-t">${t.emoji} ${esc(it.title||t.label)}</div><div class="chiprow">${chips}</div></div>`; }).join("");
+      return `<div class="itdoc"><div class="itdoc-t">${flavorEmoji(it)} ${esc(it.title||t.label)}</div><div class="chiprow">${chips}</div></div>`; }).join("");
     if(general.length) html+=`<div class="sec-sub">🗂 General</div>`;
   }
   if(general.length){
@@ -1508,12 +1547,13 @@ function sortedHotspots(){ return [...(state.hotspots||[])].sort((a,b)=>hotspotD
 function distLabel(km){ return km<1?Math.round(km*1000)+" m":km.toFixed(km<10?1:0)+" km"; }
 
 function renderHotspots(){
-  const list=sortedHotspots();
+  const list=sortedHotspots().filter(h=>!ui.hsFilter||h.type===ui.hsFilter);
   const locChip = geoState==="on" ? '<span class="chip" style="background:#e7f0ff;border-color:#cfe0ff;color:#2f6fed">◎ closest first</span>'
     : geoState==="locating" ? '<span class="chip">◎ locating…</span>'
     : geoState==="denied" ? '<span class="chip">◎ location off</span>'
     : '<button class="btn ghost sm" data-act="useLoc">◎ Use my location</button>';
-  let html=`<div class="sheet-grip"></div><div class="sec-head"><h2>Hotspots</h2><div class="sp"></div>${locChip}<button class="btn lime" data-act="addHotspot">＋ Add</button></div><div class="hs-body">`;
+  let html=`<div class="sheet-grip"></div><div class="sec-head"><h2>Hotspots</h2><div class="sp"></div>${locChip}<button class="btn lime" data-act="addHotspot">＋ Add</button></div>
+  <div class="filtrow">${[["","All"],...Object.entries(HOTSPOT_TYPES).map(([k,t])=>[k,t.emoji])].map(([k,lab])=>`<button class="fchip${(ui.hsFilter||"")===k?" on":""}" data-act="hsFilter" data-k="${k}">${lab}</button>`).join("")}</div><div class="hs-body">`;
   if(!list.length){
     html+=`<div class="empty"><div class="big">📍</div><h3>No hotspots yet</h3><p>Save places you want to check out — food, sights, activities, shops. Paste a Google Maps link and we'll grab the details; they sort by closest to you.</p>
       <div class="cta"><button class="btn lime" data-act="addHotspot">＋ Add a hotspot</button></div></div>`;
@@ -1615,7 +1655,7 @@ function openCreateMenu(){
 function renderHotspotMarkers(){
   if(!map) return; markerLayer.clearLayers(); lineLayer.clearLayers(); markersById={};
   const pts=[];
-  sortedHotspots().forEach(h=>{ const l=h.location; if(!l||l.lat==null) return; const t=HOTSPOT_TYPES[h.type]||HOTSPOT_TYPES.other; const ll=[l.lat,l.lng]; pts.push(ll);
+  sortedHotspots().filter(h=>!ui.hsFilter||h.type===ui.hsFilter).forEach(h=>{ const l=h.location; if(!l||l.lat==null) return; const t=HOTSPOT_TYPES[h.type]||HOTSPOT_TYPES.other; const ll=[l.lat,l.lng]; pts.push(ll);
     const m=L.marker(ll,{icon:L.divIcon({className:"",html:`<div class="epin" style="--c:#e0483d"><span>${t.emoji}</span></div>`,iconSize:[30,37],iconAnchor:[15,35],popupAnchor:[0,-32]})}).addTo(markerLayer);
     const gmap=`https://www.google.com/maps/search/?api=1&query=${l.lat},${l.lng}`;
     m.bindPopup(`<div class="pop"><div class="pt">${t.emoji} ${esc(h.name||t.label)}</div>${l.address?`<div class="pa">${esc(l.address)}</div>`:""}<div class="pactions"><a href="${gmap}" target="_blank" rel="noopener">↗ Maps</a></div></div>`,{maxWidth:240});
@@ -1693,8 +1733,8 @@ function resolveAirport(itemId, role, code){
 }
 
 /* ===== Long-press card actions (edit / duplicate / done / delete) ===== */
-function openItemActions(id){ const it=state.items.find(x=>x.id===id); if(!it) return; const t=TYPES[it.type]||TYPES.other;
-  openModal(`<div class="mh"><h3>${t.emoji} ${esc(it.title||t.label)}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
+function openItemActions(id){ const it=state.items.find(x=>x.id===id); if(!it) return; const t=TYPES[it.type]||TYPES.note;
+  openModal(`<div class="mh"><h3>${flavorEmoji(it)} ${esc(it.title||t.label)}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
   <div class="mb"><div class="create-grid">
     <button class="create-opt" data-act="edit" data-id="${id}"><span class="e">✎</span>Edit</button>
     <button class="create-opt" data-act="dupItem" data-id="${id}"><span class="e">⧉</span>Duplicate to another day…</button>
@@ -1712,9 +1752,8 @@ document.addEventListener("contextmenu",e=>{ const c=e.target.closest(".tl-card[
 
 /* ===== Magic quick-add: one line of text → a real item ===== */
 function inferType(s){ s=(s||"").toLowerCase();
-  if(/\b(flight|fly|boarding|[a-z]{2}\d{2,4}\b)/.test(s)) return "flight";
-  if(/\b(transfer|taxi|grab|gojek|pickup|pick-up|shuttle|driver|ferry|boat)\b/.test(s)) return "transfer";
-  if(/\b(hotel|check[- ]?in|check[- ]?out|villa|resort|stay|airbnb)\b/.test(s)) return "hotel";
+  if(/\b(flight|fly|boarding|airport|ferry|boat|speedboat|train|bus|shuttle|taxi|grab|gojek|pickup|pick-up|drive|driver|transfer)\b/.test(s)||/\b[a-z]{2}\d{2,4}\b/.test(s)) return "travel";
+  if(/\b(hotel|check[- ]?in|check[- ]?out|villa|resort|stay|airbnb|camp)\b/.test(s)) return "stay";
   if(/\b(dinner|lunch|breakfast|brunch|food|restaurant|cafe|coffee|drinks?|bar|eat|snack|warung)\b/.test(s)) return "food";
   return "activity"; }
 function parseQuickAdd(raw){
@@ -1760,13 +1799,13 @@ function dayText(d){
   const lines=[`🌴 INDO 2026 — ${fmtDateFull(d.instant,d.tz)}`];
   if(!d.items.length) lines.push("Free day — nothing planned");
   d.items.forEach(it=>{
-    const t=TYPES[it.type]||TYPES.other; const si=startInstant(it);
+    const t=TYPES[it.type]||TYPES.note; const si=startInstant(it);
     const time=si?fmtTime(si,startTz(it)):"--:--";
     const isLeg=t.legtoo&&it.fromLoc;
     let loc="";
     if(isLeg){ loc=[it.fromLoc&&(it.fromLoc.name||it.fromLoc.address), it.toLoc&&(it.toLoc.name||it.toLoc.address)].filter(Boolean).join(" → "); }
     else if(it.location){ loc=[it.location.name,it.location.address].filter(Boolean).join(", "); }
-    lines.push(`• ${it.done?"✅ ":""}${time} ${t.emoji} ${it.title||t.label}${it.flightNo?` (${it.flightNo})`:""}${loc?` — ${loc}`:""}${it.conf?` · ref ${it.conf}`:""}`);
+    lines.push(`• ${it.done?"✅ ":""}${time} ${flavorEmoji(it)} ${it.title||t.label}${it.flightNo?` (${it.flightNo})`:""}${loc?` — ${loc}`:""}${it.conf?` · ref ${it.conf}`:""}`);
   });
   return lines.join("\n");
 }
@@ -1801,7 +1840,7 @@ function buildICS(){
   sortedItems().forEach(it=>{
     const s=startInstant(it); if(!s) return; n++;
     let e=endInstant(it); if(!e||e<=s) e=new Date(s.getTime()+3600e3);
-    const t=TYPES[it.type]||TYPES.other;
+    const t=TYPES[it.type]||TYPES.note;
     const isLeg=t.legtoo&&it.fromLoc;
     const lp=[]; const l1=startLoc(it), l2=endLoc(it);
     if(l1&&(l1.name||l1.address)) lp.push(l1.name||l1.address);
@@ -1811,9 +1850,9 @@ function buildICS(){
     if(it.conf) dp.push("Booking ref: "+it.conf);
     if(it.notes) dp.push(it.notes);
     dp.push("INDO 2026 · "+location.origin+location.pathname);
-    const lead=(it.type==="flight")?"-PT3H":(it.type==="transfer")?"-PT1H":"-PT45M";
+    const lead=isFlight(it)?"-PT3H":(it.type==="travel")?"-PT1H":"-PT45M";
     out.push("BEGIN:VEVENT","UID:"+it.id+"@indo2026","DTSTAMP:"+icsDate(new Date()),"DTSTART:"+icsDate(s),"DTEND:"+icsDate(e),
-      "SUMMARY:"+icsEsc(t.emoji+" "+(it.title||t.label)),
+      "SUMMARY:"+icsEsc(flavorEmoji(it)+" "+(it.title||t.label)),
       lp.length?"LOCATION:"+icsEsc(lp.join(" → ")):null,
       "DESCRIPTION:"+icsEsc(dp.join("\n")),
       "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsEsc(it.title||t.label),"TRIGGER:"+lead,"END:VALARM",
@@ -1890,7 +1929,8 @@ function itemModal(item){
   openModal(`<div class="mh"><h3>${isEdit?"Edit item":"Add to itinerary"}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
     <div class="mb">
       <div class="field"><label>Type</label><div class="typegrid" id="typeGrid">${typeBtns}</div></div>
-      ${draft.type==="flight"?`<button type="button" class="paste-conf" data-act="pasteConf">📋 Paste confirmation email — auto-fill flight details</button>`:""}
+      ${(FLAVORS[draft.type]||[]).length>1?`<div class="field"><label>Icon <span class="hint" style="display:inline">— auto from the title, tap to override</span></label><div class="flavrow" id="flavRow"><button type="button" class="fchip${!draft.emoji?" on":""}" data-act="flavor" data-e="">✨ auto</button>${FLAVORS[draft.type].map(e=>`<button type="button" class="fchip${draft.emoji===e?" on":""}" data-act="flavor" data-e="${e}">${e}</button>`).join("")}</div></div>`:""}
+      ${draft.type==="travel"?`<button type="button" class="paste-conf" data-act="pasteConf">📋 Paste confirmation email — auto-fill flight details</button>`:""}
       <div class="field"><label>Title</label><input class="inp" id="f-title" value="${esc(draft.title)}" placeholder="${isLeg?"e.g. Flight QR1 LHR → DPS":"e.g. Snorkelling · Blue Lagoon"}"></div>
       <div class="row2"><div class="field"><label>${isLeg?"Departure date":"Date"}</label><input class="inp" type="date" id="f-date" value="${esc(draft.date||"")}"></div>
         <div class="field"><label>${isLeg?"Departure time":"Time"}</label><input class="inp" type="time" id="f-time" value="${esc(draft.time||"")}"></div></div>
@@ -1904,7 +1944,7 @@ function itemModal(item){
           <div class="field"><label>${isLeg?"Arrival zone":"End zone (optional)"}</label><select class="inp" id="f-tz2"><option value="">— same —</option>${COMMON_ZONES.map(z=>`<option value="${z.tz}"${draft.tz2===z.tz?" selected":""}>${esc(z.label)}</option>`).join("")}</select></div></div>
         ${!isLeg?`<div class="row2"><div class="field"><label>End date (optional)</label><input class="inp" type="date" id="f-date2" value="${esc(draft.date2||"")}"></div>
           <div class="field"><label>End time (optional)</label><input class="inp" type="time" id="f-time2" value="${esc(draft.time2||"")}"></div></div>`:""}
-        ${draft.type==="flight"?`<div class="field"><label>Flight number (optional — enables live status)</label><input class="inp mono" id="f-flightno" value="${esc(draft.flightNo||"")}" placeholder="e.g. QR35"></div>`:""}
+        ${draft.type==="travel"?`<div class="field"><label>Flight number (optional — flights only, enables live status)</label><input class="inp mono" id="f-flightno" value="${esc(draft.flightNo||"")}" placeholder="e.g. QR35"></div>`:""}
         <div class="field"><label>Booking / confirmation ref (optional)</label><input class="inp mono" id="f-conf" value="${esc(draft.conf||"")}" placeholder="e.g. ABC123"></div>
         <div class="field"><label>Notes (optional)</label><textarea class="inp" id="f-notes" placeholder="Anything useful — terminal, room type, what to bring…">${esc(draft.notes||"")}</textarea></div>
         <div class="field"><label>Upload files (tickets, confirmations, PDFs…)</label>
@@ -2008,13 +2048,21 @@ function collectItemForm(){ if(!$("#f-title")) return;
   const grab=prefix=>{ const qEl=$("#"+prefix+"-q"); if(!qEl) return null; const picked=(draft._tmp&&draft._tmp[prefix])||{}; const name=qEl.value.trim(),addr=$("#"+prefix+"-addr").value.trim(); const o={name,address:addr}; if(picked.lat!=null){o.lat=picked.lat;o.lng=picked.lng;if(!o.name)o.name=picked.name;} return (o.name||o.address||o.lat!=null)?o:null; };
   if(TYPES[draft.type]?.legtoo){ draft.fromLoc=grab("from"); draft.toLoc=grab("to"); draft.location=null; } else { draft.location=grab("main"); draft.fromLoc=null; draft.toLoc=null; }
 }
-function saveItem(){ collectItemForm(); if(!draft.title){ toast("Give it a title first"); return; } const _air=draft._airports; delete draft._airports; delete draft._tmp; delete draft._typeTouched; delete draft._pendingType;
+function saveItem(){ collectItemForm(); if(!draft.title){ toast("Give it a title first"); return; } if(!draft.emoji) delete draft.emoji; const _air=draft._airports; delete draft._airports; delete draft._tmp; delete draft._typeTouched; delete draft._pendingType;
   const i=state.items.findIndex(x=>x.id===draft.id); if(i>=0) state.items[i]=draft; else state.items.push(draft);
   save(); syncSet("items/"+draft.id, draft); closeModal(); refreshMap(); renderMain(); toast("Saved",true);
   if(_air){ const id=draft.id; if(_air.from&&(!draft.fromLoc||draft.fromLoc.lat==null)) resolveAirport(id,"fromLoc",_air.from); if(_air.to&&(!draft.toLoc||draft.toLoc.lat==null)) resolveAirport(id,"toLoc",_air.to); } }
+function guessDocCat(sG){ sG=(sG||"").toLowerCase();
+  if(/board|e-?ticket|flight|airline|airways|garuda|airasia/.test(sG)) return "Flight";
+  if(/insur|policy/.test(sG)) return "Insurance";
+  if(/visa|passport|immigration|voa\b/.test(sG)) return "Visa / Passport";
+  if(/hotel|resort|villa|airbnb|booking\.com|agoda/.test(sG)) return "Hotel";
+  if(/transfer|taxi|driver|shuttle/.test(sG)) return "Transfer";
+  if(/voucher|confirmation|receipt|booking|reservation|ticket/.test(sG)) return "Booking";
+  return ""; }
 function docModal(){
   draft={_dfiles:[]};
-  const itemOpts=sortedItems().map(it=>{ const t=TYPES[it.type]||TYPES.other; return `<option value="${it.id}">${t.emoji} ${esc(it.title||t.label)}</option>`; }).join("");
+  const itemOpts=sortedItems().map(it=>{ const t=TYPES[it.type]||TYPES.note; return `<option value="${it.id}">${flavorEmoji(it)} ${esc(it.title||t.label)}</option>`; }).join("");
   openModal(`<div class="mh"><h3>Add document</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
   <div class="mb">
     <div class="field"><label>Upload files (tickets, PDFs, photos…)</label>
@@ -2032,6 +2080,7 @@ function docModal(){
   </div>
   <div class="mf"><div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn lime" data-act="saveDoc">Add</button></div></div>`);
   $("#dFile").addEventListener("change",e=>handleDocFiles(e.target.files));
+  $("#d-cat").addEventListener("change",()=>{ draft._catTouched=true; });
 }
 function renderDocFileChips(){ const row=$("#dFiles"); if(row) row.innerHTML=(draft._dfiles||[]).map((f,i)=>`<span class="chip">📎 ${esc(f.name)} <button class="hs-rm" style="position:static;width:17px;height:17px;margin-left:3px" data-act="rmDocFile" data-i="${i}">✕</button></span>`).join(""); }
 async function handleDocFiles(files){
@@ -2043,10 +2092,12 @@ async function handleDocFiles(files){
   }catch(e){ if(st) st.textContent="Upload failed — check connection"; return; } }
   renderDocFileChips();
   const ti=$("#d-title"); if(ti&&!ti.value.trim()&&draft._dfiles.length===1) ti.value=draft._dfiles[0].name.replace(/\.[a-z0-9]{2,5}$/i,"");
+  if(!draft._catTouched && draft._dfiles.length){ const g=guessDocCat(draft._dfiles.map(f=>f.name).join(" ")); if(g){ const c=$("#d-cat"); if(c) c.value=g; } }
   if(st) st.textContent="Done — "+draft._dfiles.length+" file"+(draft._dfiles.length===1?"":"s")+" ready.";
 }
 function saveDoc(){
-  const title=$("#d-title").value.trim(), url=$("#d-url").value.trim(), cat=$("#d-cat").value, itemId=$("#d-item").value||null;
+  const title=$("#d-title").value.trim(), url=$("#d-url").value.trim(); let cat=$("#d-cat").value; const itemId=$("#d-item").value||null;
+  if(!draft._catTouched && !draft._dfiles.length && url){ const g=guessDocCat(url+" "+title); if(g) cat=g; }
   const files=draft._dfiles||[];
   if(!files.length && !url){ toast("Upload a file or paste a link"); return; }
   const added=[];
@@ -2065,12 +2116,12 @@ function importData(){ openModal(`<div class="mh"><h3>Import data</h3><button cl
 
 /* ---- example ---- */
 function loadExample(){ const ex=[
-  {id:uid(),type:"flight",title:"Flight · London → Denpasar (Bali)",date:"2026-07-01",time:"21:35",tz:"Europe/London",date2:"2026-07-02",time2:"22:55",tz2:"Asia/Makassar",conf:"QR-7HX2",notes:"1 stop Doha (DOH) · 2h layover. Window seats 24A/B.",fromLoc:{name:"London Heathrow (LHR)",address:"Longford TW6, UK",lat:51.4700,lng:-0.4543},toLoc:{name:"Ngurah Rai Intl (DPS)",address:"Tuban, Kuta, Badung Regency, Bali",lat:-8.7467,lng:115.1671}},
-  {id:uid(),type:"transfer",title:"Airport pickup → Seminyak",date:"2026-07-02",time:"23:30",tz:"Asia/Makassar",conf:"BALICAB-119",notes:"Driver Putu waiting at arrivals with name sign.",fromLoc:{name:"Ngurah Rai Intl (DPS)",address:"Tuban, Kuta, Bali",lat:-8.7467,lng:115.1671},toLoc:{name:"The Legian Seminyak",address:"Jl. Kayu Aya, Seminyak, Bali",lat:-8.6916,lng:115.1561}},
-  {id:uid(),type:"hotel",title:"The Legian Seminyak (2 nights)",date:"2026-07-02",time:"23:55",tz:"Asia/Makassar",date2:"2026-07-04",time2:"11:00",conf:"LGN-558210",notes:"Ocean suite. Breakfast included. Late checkout requested.",location:{name:"The Legian Seminyak",address:"Jl. Kayu Aya, Seminyak, Bali 80361",lat:-8.6916,lng:115.1561}},
+  {id:uid(),type:"travel",title:"Flight · London → Denpasar (Bali)",date:"2026-07-01",time:"21:35",tz:"Europe/London",date2:"2026-07-02",time2:"22:55",tz2:"Asia/Makassar",conf:"QR-7HX2",notes:"1 stop Doha (DOH) · 2h layover. Window seats 24A/B.",fromLoc:{name:"London Heathrow (LHR)",address:"Longford TW6, UK",lat:51.4700,lng:-0.4543},toLoc:{name:"Ngurah Rai Intl (DPS)",address:"Tuban, Kuta, Badung Regency, Bali",lat:-8.7467,lng:115.1671}},
+  {id:uid(),type:"travel",title:"Airport pickup → Seminyak",date:"2026-07-02",time:"23:30",tz:"Asia/Makassar",conf:"BALICAB-119",notes:"Driver Putu waiting at arrivals with name sign.",fromLoc:{name:"Ngurah Rai Intl (DPS)",address:"Tuban, Kuta, Bali",lat:-8.7467,lng:115.1671},toLoc:{name:"The Legian Seminyak",address:"Jl. Kayu Aya, Seminyak, Bali",lat:-8.6916,lng:115.1561}},
+  {id:uid(),type:"stay",title:"The Legian Seminyak (2 nights)",date:"2026-07-02",time:"23:55",tz:"Asia/Makassar",date2:"2026-07-04",time2:"11:00",conf:"LGN-558210",notes:"Ocean suite. Breakfast included. Late checkout requested.",location:{name:"The Legian Seminyak",address:"Jl. Kayu Aya, Seminyak, Bali 80361",lat:-8.6916,lng:115.1561}},
   {id:uid(),type:"activity",title:"Uluwatu Temple + Kecak fire dance",date:"2026-07-03",time:"16:30",tz:"Asia/Makassar",notes:"Sunset show 18:00. Cover knees/shoulders. Watch the monkeys!",location:{name:"Uluwatu Temple",address:"Pecatu, South Kuta, Badung Regency, Bali",lat:-8.8291,lng:115.0849}},
   {id:uid(),type:"food",title:"Dinner · La Lucciola",date:"2026-07-03",time:"20:00",tz:"Asia/Makassar",notes:"Beachfront. Booked under Henri.",location:{name:"La Lucciola",address:"Jl. Petitenget, Seminyak, Bali",lat:-8.6790,lng:115.1560}},
-  {id:uid(),type:"transfer",title:"Drive to Ubud",date:"2026-07-04",time:"11:30",tz:"Asia/Makassar",fromLoc:{name:"The Legian Seminyak",address:"Seminyak, Bali",lat:-8.6916,lng:115.1561},toLoc:{name:"Ubud",address:"Ubud, Gianyar Regency, Bali",lat:-8.5069,lng:115.2625}},
+  {id:uid(),type:"travel",title:"Drive to Ubud",date:"2026-07-04",time:"11:30",tz:"Asia/Makassar",fromLoc:{name:"The Legian Seminyak",address:"Seminyak, Bali",lat:-8.6916,lng:115.1561},toLoc:{name:"Ubud",address:"Ubud, Gianyar Regency, Bali",lat:-8.5069,lng:115.2625}},
   {id:uid(),type:"activity",title:"Tegallalang Rice Terraces",date:"2026-07-05",time:"08:00",tz:"Asia/Makassar",notes:"Go early to beat crowds + heat. Jungle swing nearby.",location:{name:"Tegallalang Rice Terraces",address:"Tegallalang, Gianyar Regency, Bali",lat:-8.4312,lng:115.2773}},
 ]; state.items.push(...ex); ui.dayIdx=null; save(); pushAll(); refreshMap(); renderMain(); toast("Loaded a Bali example — edit or delete freely",true); }
 
@@ -2089,6 +2140,7 @@ document.addEventListener("click",e=>{
     case "copyDay": { const d=tripDays().find(x=>x.key===a.dataset.date); if(d) copy(dayText(d)); break; }
     case "gonext": { expandItem(id); setTimeout(()=>{ document.querySelector('.tl-card[data-card="'+cssEsc(id)+'"]')?.scrollIntoView({block:"center",behavior:"smooth"}); },120); break; }
     case "editEss": essModal(); break;
+    case "docFilter": ui.docFilter=a.dataset.k||""; renderMain(); break;
     case "copyEss": copy((state.meta.essentials||"").trim()); break;
     case "saveEss": { const v=$("#essText").value.trim(); state.meta.essentials=(v===ESS_TEMPLATE.trim()?"":v); save(); syncSet("meta",state.meta); closeModal(); renderMain(); toast("Essentials saved",true); break; }
     case "durChip": { const mins=a.dataset.min; const tEl=$("#f-time"), t2El=$("#f-time2"), dEl=$("#f-date"), d2El=$("#f-date2");
@@ -2100,6 +2152,8 @@ document.addEventListener("click",e=>{
       if(t2El) t2El.value=String(eh).padStart(2,"0")+":"+String(em).padStart(2,"0");
       if(d2El){ if(total>=1440 && dEl&&dEl.value){ const dd=new Date(dEl.value+"T00:00:00Z"); dd.setUTCDate(dd.getUTCDate()+1); d2El.value=dd.toISOString().slice(0,10); } else d2El.value=""; }
       break; }
+    case "flavor": { if(!draft) break; draft.emoji=a.dataset.e||""; if(!draft.emoji) delete draft.emoji;
+      document.querySelectorAll("#flavRow .fchip").forEach(b=>b.classList.toggle("on", (b.dataset.e||"")===(draft.emoji||""))); break; }
     case "toggleMore": { const f=$("#moreFold"); if(f){ const open=f.style.display!=="none"; f.style.display=open?"none":"block"; const ch=a.querySelector(".mchev"); if(ch) ch.style.transform=open?"":"rotate(180deg)"; } break; }
     case "itinDay": setItinMode("day"); break;
     case "itinAll": setItinMode("all"); break;
@@ -2110,6 +2164,7 @@ document.addEventListener("click",e=>{
     case "delHotspot": if(confirm("Delete this hotspot?")){ state.hotspots=(state.hotspots||[]).filter(x=>x.id!==id); save(); syncRemove("hotspots/"+id); closeModal(); refreshMap(); renderMain(); toast("Deleted",true);} break;
     case "hsFocus": hsFocus(id); break;
     case "useLoc": startGeo(); break;
+    case "hsFilter": ui.hsFilter=a.dataset.k||""; renderHotspots(); refreshMap(); break;
     case "rmPhoto": { const i=+a.dataset.i; if(draft&&draft.photos){ draft.photos.splice(i,1); const row=$("#hPhotos"); if(row) row.innerHTML=draft.photos.map((u,k)=>`<div class="hs-thumb" style="background-image:url('${esc(u)}')"><button class="hs-rm" data-act="rmPhoto" data-i="${k}">✕</button></div>`).join(""); } break; }
     case "rmFile": { const i=+a.dataset.i; if(draft&&draft.files){ draft.files.splice(i,1); renderItemFileChips(); } break; }
     case "pasteConf": { collectItemForm();
@@ -2120,7 +2175,7 @@ document.addEventListener("click",e=>{
       break; }
     case "applyConf": { const out=parseConfBlob($("#confText").value);
       if(!Object.keys(out).length){ toast("Couldn't find flight details in that"); break; }
-      draft.type="flight"; draft._typeTouched=true;
+      draft.type="travel"; draft._typeTouched=true;
       if(out.flightNo) draft.flightNo=out.flightNo;
       if(out.conf) draft.conf=out.conf;
       if(out.date) draft.date=out.date;
@@ -2133,7 +2188,7 @@ document.addEventListener("click",e=>{
       itemModal(draft);
       toast("✓ Filled from the confirmation — check & save",true);
       break; }
-    case "dupItem": { const it=state.items.find(x=>x.id===id); if(!it) break; const days=tripDays(); const t=TYPES[it.type]||TYPES.other;
+    case "dupItem": { const it=state.items.find(x=>x.id===id); if(!it) break; const days=tripDays(); const t=TYPES[it.type]||TYPES.note;
       openModal(`<div class="mh"><h3>⧉ Duplicate · ${esc(it.title||t.label)}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
       <div class="mb"><div class="create-grid">
         ${it.date?`<button class="create-opt" data-act="dupTo" data-id="${id}" data-date="${esc(it.date)}"><span class="e">📄</span>Same day</button>`:""}
@@ -2150,7 +2205,10 @@ document.addEventListener("click",e=>{
     case "toggleDone": { const it=state.items.find(x=>x.id===id); if(!it) break; it.done=!it.done; save(); syncSet("items/"+id,it); closeModal(); renderMain(); break; }
     case "hsToItin": { const h=(state.hotspots||[]).find(x=>x.id===id); if(!h) break;
       const mapT = h.type==="food" ? "food" : "activity";
-      itemModal({id:uid(), type:mapT, title:h.name||"", date:"", time:"", tz:state.meta.destTz, location:JSON.parse(JSON.stringify(h.location||{})), hotspotId:h.id, docIds:[], files:[]});
+      const hsEmoji={sight:"📸",beach:"🏖️",nature:"🥾",shop:"🛍️",show:"🎭"}[h.type]||"";
+      const pre={id:uid(), type:mapT, title:h.name||"", date:"", time:"", tz:state.meta.destTz, location:JSON.parse(JSON.stringify(h.location||{})), hotspotId:h.id, docIds:[], files:[]};
+      if(hsEmoji) pre.emoji=hsEmoji;
+      itemModal(pre);
       break; }
     case "goItem": { const it=state.items.find(x=>x.id===id); if(!it) break;
       setView("today"); if(ui.itinMode!=="day") setItinMode("day");
@@ -2198,7 +2256,7 @@ document.addEventListener("click",e=>{
     case "copyExp": copy($("#exp").value); break;
     case "downloadExp": { const blob=new Blob([$("#exp").value],{type:"text/plain"}); const u=URL.createObjectURL(blob); const x=document.createElement("a"); x.href=u; x.download="indo-2026-backup.txt"; x.click(); URL.revokeObjectURL(u); break; }
     case "import": importData(); break;
-    case "doImport": { try{ const obj=JSON.parse(decodeURIComponent(escape(atob($("#imp").value.trim())))); if(!obj.meta) throw 0; state=obj; ui.dayIdx=null; save(); closeModal(); afterLoad(); pushAll(); toast("Imported",true);}catch(err){ toast("That code didn’t parse"); } break; }
+    case "doImport": { try{ const obj=JSON.parse(decodeURIComponent(escape(atob($("#imp").value.trim())))); if(!obj.meta) throw 0; state=migrateTypes(obj); ui.dayIdx=null; save(); closeModal(); afterLoad(); pushAll(); toast("Imported",true);}catch(err){ toast("That code didn’t parse"); } break; }
     case "clear": if(confirm("Erase all trip data? This clears it on BOTH your and Elisa's devices. (Export a backup first if unsure.)")){ state=blankState(); ui.dayIdx=null; save(); if(tripRef) tripRef.set({meta:state.meta, items:{}, docs:{}, hotspots:{}}); afterLoad(); } break;
   }
 });
