@@ -573,7 +573,10 @@
   .create-opt .e{font-size:24px}
 
   /* Day / All segmented toggle (Itinerary tab) */
-  .itinbar{display:flex; justify-content:flex-end; padding:9px 16px 4px}
+  .itinbar{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 16px 6px}
+  .ititle{flex:1; min-width:0}
+  .ibig{font-size:21px; font-weight:800; letter-spacing:-.015em; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .isub{font-size:12px; color:var(--muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .sec-head.itinhead{align-items:center}
   .segtoggle{display:inline-flex; background:var(--bg); border:1px solid var(--line); border-radius:11px; padding:2px; gap:2px}
   .segtoggle button{padding:5px 13px; border-radius:8px; font-size:12.5px; font-weight:600; color:var(--muted); transition:color .15s, background .15s, box-shadow .15s}
@@ -659,7 +662,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r49";
+const APP_BUILD = "11 Jun 2026 · r50";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1385,7 +1388,11 @@ function legHTML(a,b){ const lg=legInfo(a,b); if(!lg) return "";
 function renderItinerary(){
   const days=tripDays();
   const todayKey=dayKey(new Date(),state.meta.destTz);
-  let html=`<div class="sheet-grip"></div><div class="itinbar">${itinToggleHTML()}</div><div class="it-body alltl">`;
+  const dr=(()=>{ if(!days.length) return ""; const a=days[0], b=days[days.length-1];
+    const f=(d,withM)=>new Intl.DateTimeFormat("en-GB",{timeZone:d.tz,day:"numeric",...(withM?{month:"short"}:{})}).format(d.instant);
+    const sameM=new Intl.DateTimeFormat("en-GB",{timeZone:a.tz,month:"short"}).format(a.instant)===new Intl.DateTimeFormat("en-GB",{timeZone:b.tz,month:"short"}).format(b.instant);
+    return `${sameM?f(a,false):f(a,true)} – ${f(b,true)} · ${days.length} day${days.length===1?"":"s"}`; })();
+  let html=`<div class="sheet-grip"></div><div class="itinbar"><div class="ititle"><div class="ibig" id="itBig">Itinerary</div><div class="isub" id="itSub">${esc(dr)}</div></div>${itinToggleHTML()}</div><div class="it-body alltl">`;
   if(!days.length){
     html+=`<div class="empty"><div class="big">🌴</div><h3>Plan your Indonesia trip</h3><p>Add flights, hotels, transfers and activities.<br>Each shows on the map with copyable addresses, local times and live travel times.</p>
       <div class="cta"><button class="btn lime" data-act="add">＋ Add first item</button><button class="btn ghost" data-act="addExample">Load a Bali example</button></div></div>`;
@@ -1393,12 +1400,28 @@ function renderItinerary(){
     html+=countdownHTML(days);
     days.forEach(d=>{
       const isToday=d.key===todayKey;
-      html+=`<div class="daybar${isToday?" istoday":""}"><span class="d">${esc(fmtDateFull(d.instant,d.tz))}</span><span class="ln"></span><span class="wx" data-wxdate="${d.key}" style="display:none"></span><span class="dtz">${esc(dayZonesLabel(d))}</span>${d.items.length?`<button class="iconbtn" data-act="copyDay" data-date="${d.key}" title="Copy day as text">⧉</button>`:""}</div>`;
+      html+=`<div class="daybar${isToday?" istoday":""}" data-dbkey="${d.key}"><span class="d">${esc(fmtDateFull(d.instant,d.tz))}</span><span class="ln"></span><span class="wx" data-wxdate="${d.key}" style="display:none"></span><span class="dtz">${esc(dayZonesLabel(d))}</span>${d.items.length?`<button class="iconbtn" data-act="copyDay" data-date="${d.key}" title="Copy day as text">⧉</button>`:""}</div>`;
       html+=dayTimelineHTML(d,todayKey);
     });
   }
   $("#main").innerHTML=html+`</div>`;
   assignWxLocs(days); updateWxUI(days); refreshWeather(days);
+  bindItinHeaderScroll();
+  updateItinHeader._range=dr; updateItinHeader();
+}
+function updateItinHeader(){
+  if(!(ui.view==="today"&&ui.itinMode==="all")) return;
+  const big=$("#itBig"), sub=$("#itSub"), bar=document.querySelector(".itinbar"); if(!big||!bar) return;
+  const bars=[...document.querySelectorAll('.daybar[data-dbkey]')]; if(!bars.length) return;
+  const edge=bar.getBoundingClientRect().bottom+8;
+  let cur=-1; bars.forEach((b,i)=>{ if(b.getBoundingClientRect().top<=edge) cur=i; });
+  if(cur<0){ big.textContent="Itinerary"; sub.textContent=updateItinHeader._range||""; }
+  else { const d=tripDays()[cur]; if(!d) return; big.textContent=fmtDateShort(d.instant,d.tz); sub.textContent=`Day ${cur+1}/${bars.length}`; }
+}
+let _ihRaf=null;
+function bindItinHeaderScroll(){
+  const m=$("#main"); if(m&&!m._ihBound){ m._ihBound=true; m.addEventListener("scroll",()=>{ if(_ihRaf) return; _ihRaf=requestAnimationFrame(()=>{ _ihRaf=null; updateItinHeader(); }); },{passive:true}); }
+  if(!window._ihWinBound){ window._ihWinBound=true; window.addEventListener("scroll",()=>{ if(_ihRaf) return; _ihRaf=requestAnimationFrame(()=>{ _ihRaf=null; updateItinHeader(); }); },{passive:true}); }
 }
 
 /* ====================== DOCUMENTS ====================== */
