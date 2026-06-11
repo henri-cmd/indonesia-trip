@@ -452,6 +452,10 @@
   .filtrow::-webkit-scrollbar{display:none}
   .fchip{flex:none; padding:7px 13px; border:1px solid var(--line); border-radius:20px; background:var(--card); font-size:13px; font-weight:600; color:var(--muted)}
   .fchip.on{background:var(--ink); color:#fff; border-color:var(--ink)}
+  .imp-row{display:flex; align-items:flex-start; gap:10px; padding:11px 12px; border:1px solid var(--line); border-radius:12px; margin-top:8px; background:var(--card)}
+  .imp-row input{width:18px;height:18px;accent-color:#5f8b06;margin-top:2px}
+  .imp-row .ie{font-size:18px; flex:none}
+  .imp-row .it2{flex:1; min-width:0; font-size:13.5px; line-height:1.45}
   .flavrow{display:flex; gap:7px; flex-wrap:wrap}
   .flavrow .fchip{font-size:15px; padding:7px 11px}
   .durrow{display:flex; gap:7px; flex-wrap:wrap}
@@ -668,11 +672,12 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r53";
+const APP_BUILD = "11 Jun 2026 · r54";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
 function getMapsKey(){ return ((state.meta.mapsKey||"").trim()) || DEFAULT_MAPS_KEY; }
+function getAiKey(){ return (state.meta.aiKey||"").trim(); }
 const IDN_ZONES = [
   {tz:"Asia/Makassar", abbr:"WITA", label:"Bali / Lombok / Sulawesi (WITA, UTC+8)"},
   {tz:"Asia/Jakarta",  abbr:"WIB",  label:"Jakarta / Java / Sumatra (WIB, UTC+7)"},
@@ -1286,7 +1291,8 @@ function dayZonesLabel(d){
 }
 function dayPage(d,idx,total,todayKey){
   const copyBtn = d.items.length? `<div class="copyday-wrap"><button class="btn ghost sm" data-act="copyDay" data-date="${d.key}">⧉ Copy day as text</button></div>` : "";
-  const qadd=`<form class="qadd" data-date="${d.key}" autocomplete="off"><input class="qadd-in" type="text" enterkeyhint="done" placeholder="✨ Quick add — 19:30 dinner at Locavore"><button class="qadd-go" type="submit" aria-label="Add">↵</button></form>`;
+  const qadd=`<form class="qadd" data-date="${d.key}" autocomplete="off"><input class="qadd-in" type="text" enterkeyhint="done" placeholder="✨ Quick add — 19:30 dinner at Locavore"><button class="qadd-go" type="submit" aria-label="Add">↵</button></form>
+  <div class="copyday-wrap" style="margin-top:10px"><button class="btn ghost sm" data-act="importDoc" data-date="${d.key}">✨ Import from ticket / booking</button></div>`;
   return `<div class="daypage" data-page="${idx}">${idx===0?countdownHTML(tripDays()):""}${upNextHTML(d,todayKey)}${dayTimelineHTML(d,todayKey)}${ghostRowsHTML(d)}${qadd}${copyBtn}</div>`;
 }
 function tlRow(it,isLast){
@@ -1650,6 +1656,7 @@ function openCreateMenu(){
     <button class="create-opt" data-act="newItem"><span class="e">🗓️</span>Itinerary item</button>
     <button class="create-opt" data-act="newHotspot"><span class="e">📍</span>Hotspot</button>
     <button class="create-opt" data-act="newDoc"><span class="e">📎</span>Document</button>
+    <button class="create-opt" data-act="importDoc"><span class="e">✨</span>Import from ticket / booking</button>
   </div></div>`);
 }
 function renderHotspotMarkers(){
@@ -1704,6 +1711,120 @@ function updateWxUI(days){
 }
 
 /* ====================== COPY DAY AS TEXT ====================== */
+/* ===== ✨ Import: documents → itinerary items (Gemini multimodal + local fallbacks) ===== */
+const AI_MODEL="gemini-2.5-flash";
+function aiPrompt(hintDate){
+  const days=tripDays(); const range=days.length?`${days[0].key} to ${days[days.length-1].key}`:"around 2026-07";
+  return `Extract travel itinerary items from this document (ticket, booking confirmation, screenshot or email). Trip context: Indonesia (Bali area), trip dates ${range}.${hintDate?` If the document has no date, assume ${hintDate}.`:""}
+Return ONLY a JSON array (no prose). Each element: {"type":"travel|stay|activity|food|note","title":string,"date":"YYYY-MM-DD"|null,"time":"HH:MM" 24h|null,"endDate":string|null,"endTime":string|null,"place":string|null (place name to find on a map),"flightNo":string|null,"ref":string|null (booking reference),"notes":string|null (seat, terminal, anything useful, max 120 chars)}.
+Use "travel" for flights/ferries/transfers (place = departure point), "stay" for accommodation (date = check-in, endDate = check-out). Prefer the document's own timezone context. If you find a return/second leg, output it as a separate element.`;
+}
+async function aiExtractItems(parts,hintDate){
+  const key=getAiKey(); if(!key) throw new Error("no-key");
+  const body={contents:[{parts:[{text:aiPrompt(hintDate)},...parts]}],generationConfig:{responseMimeType:"application/json",temperature:0.1}};
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${AI_MODEL}:generateContent?key=${encodeURIComponent(key)}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const j=await r.json();
+  if(!r.ok){ const msg=(j&&j.error&&j.error.message)||("HTTP "+r.status); const e=new Error(msg); e.code=r.status; throw e; }
+  const txt=j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts&&j.candidates[0].content.parts.map(pp=>pp.text||"").join("")||"";
+  let arr; try{ arr=JSON.parse(txt); }catch(e){ const mJ=txt.match(/\[[\s\S]*\]/); arr=mJ?JSON.parse(mJ[0]):[]; }
+  return Array.isArray(arr)?arr:[arr];
+}
+function fileToB64(f){ return new Promise((res,rej)=>{ const rd=new FileReader(); rd.onload=()=>res(String(rd.result).split(",")[1]); rd.onerror=rej; rd.readAsDataURL(f); }); }
+let _pdfjs=null;
+async function pdfText(f){
+  if(!_pdfjs){ await new Promise((res,rej)=>{ const sc=document.createElement("script"); sc.src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"; sc.onload=res; sc.onerror=rej; document.head.appendChild(sc); });
+    _pdfjs=window["pdfjs-dist/build/pdf"]||window.pdfjsLib; _pdfjs.GlobalWorkerOptions.workerSrc="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js"; }
+  const buf=await f.arrayBuffer(); const doc=await _pdfjs.getDocument({data:buf}).promise;
+  let out=""; const nP=Math.min(doc.numPages,4);
+  for(let i=1;i<=nP;i++){ const pg=await doc.getPage(i); const tc=await pg.getTextContent(); out+=tc.items.map(x=>x.str).join(" ")+"\n"; }
+  return out;
+}
+let importCtx={files:[],proposals:[],hintDate:""};
+function importModal(hintDate){
+  importCtx={files:[],proposals:[],hintDate:hintDate||""};
+  const hasKey=!!getAiKey();
+  openModal(`<div class="mh"><h3>✨ Import from a document</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
+  <div class="mb">
+    <div class="hint" style="margin-bottom:10px">${hasKey?"Flight PDFs, booking screenshots, ticket photos — I'll read them and propose itinerary items.":"<b>No AI key set</b> (Settings) — text-PDFs and pasted text still parse locally; screenshots need the key."}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <label class="btn lime sm" style="display:inline-flex">📁 Choose file<input type="file" id="impFile" accept="image/*,application/pdf" multiple style="display:none"></label>
+      <button class="btn ghost sm" data-act="impPaste">📋 Paste screenshot / text</button>
+    </div>
+    <div class="field" style="margin-top:12px"><label>…or paste confirmation text</label><textarea class="inp" id="impText" style="min-height:110px" placeholder="Paste anything…"></textarea></div>
+    <div id="impStatus" class="hint"></div>
+    <div id="impList"></div>
+  </div>
+  <div class="mf"><div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn lime" id="impGo" data-act="impConfirm" style="display:none">Add selected</button></div></div>`);
+  $("#impFile").addEventListener("change",e=>runImport([...e.target.files]));
+  $("#impText").addEventListener("change",()=>{ const v=$("#impText").value.trim(); if(v) runImportText(v); });
+}
+function impStatus(t){ const e=$("#impStatus"); if(e) e.textContent=t; }
+async function runImport(files){
+  if(!files.length) return; importCtx.files=files;
+  try{
+    if(getAiKey()){
+      impStatus("✨ Reading with Gemini…");
+      const parts=[]; for(const f of files){ parts.push({inline_data:{mime_type:f.type||"application/octet-stream",data:await fileToB64(f)}}); }
+      const arr=await aiExtractItems(parts,importCtx.hintDate);
+      showProposals(arr);
+    } else {
+      const pdfs=files.filter(f=>f.type==="application/pdf");
+      if(!pdfs.length){ impStatus("Screenshots need the Gemini key — add it in Settings (or paste the text instead)."); return; }
+      impStatus("Reading PDF text…");
+      let txt=""; for(const f of pdfs) txt+=await pdfText(f)+"\n";
+      localProposalFromText(txt);
+    }
+  }catch(e){ impStatus(importErrMsg(e)); }
+}
+async function runImportText(txt){
+  try{
+    if(getAiKey()){ impStatus("✨ Reading with Gemini…"); showProposals(await aiExtractItems([{text:txt}],importCtx.hintDate)); }
+    else localProposalFromText(txt);
+  }catch(e){ impStatus(importErrMsg(e)); }
+}
+function importErrMsg(e){
+  const mM=String(e&&e.message||e);
+  if(/prepayment|RESOURCE_EXHAUSTED|quota|429/i.test(mM)) return "Gemini says your credits are depleted — top up at ai.studio/projects, then try again.";
+  if(/no-key/.test(mM)) return "Add your Gemini key in Settings first.";
+  return "Couldn't read that ("+mM.slice(0,80)+")";
+}
+function localProposalFromText(txt){
+  const out=parseConfBlob(txt||"");
+  if(!Object.keys(out).length){ impStatus("Couldn't find booking details in that."); return; }
+  showProposals([{type:"travel",title:"Flight"+(out.fromCode?` · ${out.fromCode} → ${out.toCode}`:""),date:out.date||null,time:out.time||null,endDate:out.date2||null,endTime:out.time2||null,place:out.fromCode?out.fromCode+" airport":null,flightNo:out.flightNo||null,ref:out.conf||null,notes:null}]);
+}
+function showProposals(arr){
+  importCtx.proposals=(arr||[]).filter(x=>x&&x.title);
+  if(!importCtx.proposals.length){ impStatus("Nothing usable found in that document."); return; }
+  impStatus("Found "+importCtx.proposals.length+" — untick any you don't want:");
+  $("#impList").innerHTML=importCtx.proposals.map((pp,i)=>{ const fake={type:pp.type||"note",title:pp.title,notes:pp.notes||"",emoji:"",flightNo:pp.flightNo||""};
+    return `<label class="imp-row"><input type="checkbox" data-imp="${i}" checked><span class="ie">${flavorEmoji(fake)}</span><span class="it2"><b>${esc(pp.title)}</b><br><span class="addr">${esc([pp.date,pp.time,pp.place].filter(Boolean).join(" · ")||"no date — will need one")}</span></span></label>`; }).join("");
+  $("#impGo").style.display="";
+}
+async function importConfirm(){
+  const picks=[...document.querySelectorAll('[data-imp]')].map((c,i)=>c.checked?importCtx.proposals[i]:null).filter(Boolean);
+  if(!picks.length){ toast("Nothing ticked"); return; }
+  const made=[];
+  picks.forEach(pp=>{
+    const it={id:uid(), type:["travel","stay","activity","food","note"].includes(pp.type)?pp.type:"note", title:String(pp.title).slice(0,90),
+      date:pp.date||importCtx.hintDate||"", time:pp.time||"", tz:state.meta.destTz, location:{}, docIds:[], files:[]};
+    if(pp.endDate) it.date2=pp.endDate; if(pp.endTime) it.time2=pp.endTime;
+    if(pp.flightNo) it.flightNo=String(pp.flightNo).toUpperCase().replace(/\s+/g,"");
+    if(pp.ref) it.conf=String(pp.ref); if(pp.notes) it.notes=String(pp.notes);
+    state.items.push(it); syncSet("items/"+it.id,it); made.push(it);
+    if(pp.place) quickAddEnrich(it.id, String(pp.place));
+  });
+  save();
+  // attach source file(s) to the first created item
+  if(importCtx.files.length&&made.length&&fstore){
+    const host=made[0]; host.files=host.files||[];
+    for(const f of importCtx.files){ try{ const ref=fstore.ref("trips/"+tripId+"/items/"+host.id+"/"+uid()+"_"+f.name.replace(/[^\w.\- ]/g,"")); await ref.put(f); host.files.push({name:f.name,url:await ref.getDownloadURL(),type:f.type||"",size:f.size||0}); }catch(e){} }
+    save(); syncSet("items/"+host.id,host);
+  }
+  closeModal(); renderMain(); refreshMap();
+  toast("✨ Added "+made.length+" item"+(made.length===1?"":"s")+(importCtx.files.length?" — ticket attached":""),true);
+}
+
 /* ===== Paste-anything: parse an airline confirmation blob ===== */
 function parseConfBlob(txt){
   const out={}; const T=(txt||"").replace(/\u00a0/g," ");
@@ -1880,6 +2001,9 @@ function renderSettings(){ const m=state.meta; const ownKey=!!(m.mapsKey||"").tr
       <div class="field"><label>Destination time zone (header clock)</label><select class="inp" data-set="destTz">${zoneOptions(m.destTz)}</select><div class="hint">Bali & Lombok are WITA (UTC+8). Each item can still have its own zone.</div></div>
     </div>
     <div class="field"><label>Time format</label><select class="inp" data-set="clock"><option value="24"${m.clock!=="12"?" selected":""}>24-hour · 20:45</option><option value="12"${m.clock==="12"?" selected":""}>12-hour · 8:45 pm</option></select></div>
+    <div class="field"><label>Gemini AI key <span class="keystatus ${(m.aiKey||"").trim()?"on":"off"}">${(m.aiKey||"").trim()?"● import magic on":"○ not set"}</span></label>
+      <input class="inp mono" type="password" data-set="aiKey" placeholder="AQ.… or AIza… from aistudio.google.com/apikey" value="${esc(m.aiKey||"")}">
+      <div class="hint">Powers <b>✨ Import</b> — turn flight PDFs, booking screenshots and ticket photos into itinerary items automatically. Stored in your shared trip (not public). Manage credits at <a href="https://ai.studio/projects" target="_blank" rel="noopener">ai.studio</a>.</div></div>
     <div class="field"><label>Calendar</label><button class="btn ghost" data-act="icsExport" style="justify-content:center">📆 Download trip calendar (.ics)</button><div class="hint">Every flight, transfer and activity lands in your real calendar (with reminders — 3h before flights). Open the downloaded file and iOS/Google Calendar does the rest. Re-download after big changes.</div></div>
     <div class="field"><label>Google Maps API key <span class="keystatus ${keyOn?"on":"off"}">${keyOn?"● live data on":"○ using estimates"}</span></label>
       <input class="inp mono" type="password" data-set="mapsKey" placeholder="${ownKey?'AIza…':'Built-in key active — leave blank'}" value="${esc(m.mapsKey)}">
@@ -2167,6 +2291,15 @@ document.addEventListener("click",e=>{
     case "hsFilter": ui.hsFilter=a.dataset.k||""; renderHotspots(); refreshMap(); break;
     case "rmPhoto": { const i=+a.dataset.i; if(draft&&draft.photos){ draft.photos.splice(i,1); const row=$("#hPhotos"); if(row) row.innerHTML=draft.photos.map((u,k)=>`<div class="hs-thumb" style="background-image:url('${esc(u)}')"><button class="hs-rm" data-act="rmPhoto" data-i="${k}">✕</button></div>`).join(""); } break; }
     case "rmFile": { const i=+a.dataset.i; if(draft&&draft.files){ draft.files.splice(i,1); renderItemFileChips(); } break; }
+    case "importDoc": closeModal(); importModal(a.dataset.date||""); break;
+    case "impConfirm": importConfirm(); break;
+    case "impPaste": { (async()=>{ try{
+        if(navigator.clipboard&&navigator.clipboard.read){ const cls=await navigator.clipboard.read();
+          for(const ci of cls){ const imgT=ci.types.find(t=>t.startsWith("image/"));
+            if(imgT){ const blob=await ci.getType(imgT); runImport([new File([blob],"pasted."+imgT.split("/")[1],{type:imgT})]); return; } } }
+        const tx=await (navigator.clipboard&&navigator.clipboard.readText?navigator.clipboard.readText():Promise.resolve(""));
+        if(tx&&tx.trim()){ $("#impText").value=tx; runImportText(tx.trim()); } else impStatus("Clipboard is empty (or blocked) — use Choose file or paste into the text box.");
+      }catch(e){ impStatus("Couldn't read the clipboard — paste into the text box instead."); } })(); break; }
     case "pasteConf": { collectItemForm();
       openModal(`<div class="mh"><h3>📋 Paste confirmation</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
       <div class="mb"><div class="field"><label>Paste the airline email / booking text — I'll pull out the flight number, times, date, route and reference</label>
