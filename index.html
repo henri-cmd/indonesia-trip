@@ -659,7 +659,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r48";
+const APP_BUILD = "11 Jun 2026 · r49";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1000,13 +1000,15 @@ function renderClocks(){ document.body.dataset.clock=state.meta.clock==="12"?"12
 function syncHeadH(){ const h=document.querySelector("header.top"); if(h) document.documentElement.style.setProperty("--head-h", Math.round(h.getBoundingClientRect().height)+"px"); }
 /* ===== Bottom sheet (mobile Itinerary + Hotspots): map behind, content in a draggable sheet ===== */
 const SHEET_KEY="indoTrip.sheet";
-/* Itinerary-first: the sheet never drops below the classic split — "half" (map as
-   accessory above) or "full" (map hidden). No map-dominant peek state (Henri). */
-let sheet={ state: (["half","full"].includes(localStorage.getItem(SHEET_KEY))?localStorage.getItem(SHEET_KEY):"half") };
+/* Three stops: full (map hidden) · half (DEFAULT + preferred — snap is biased to it)
+   · down (sheet collapsed to the handle, map dominant). Down is safe now because only
+   the handle moves the sheet — scrolling can never end up there by accident (Henri). */
+let sheet={ state: (["half","full","down"].includes(localStorage.getItem(SHEET_KEY))?localStorage.getItem(SHEET_KEY):"half") };
 function sheetViews(){ return ui.view==="today"||ui.view==="hotspots"; }
 function sheetAppEl(){ return document.querySelector(".app"); }
 function sheetSnapPx(name){ const a=sheetAppEl(); const H=a?a.clientHeight:600;
   if(name==="full") return 0;
+  if(name==="down") return Math.max(0, H-46);
   return Math.round(H*0.46); }
 function sheetCurTop(){ const a=sheetAppEl(); const v=a&&a.style.getPropertyValue("--sheet-top"); return v?parseFloat(v):sheetSnapPx(sheet.state); }
 function applySheetTop(px,animate){ const a=sheetAppEl(); if(!a) return; a.classList.toggle("sheet-anim",!!animate); a.style.setProperty("--sheet-top", Math.round(px)+"px"); }
@@ -1041,17 +1043,22 @@ function bindSheetGestures(){
       dragging=true;
     }
     e.preventDefault();
-    const half=sheetSnapPx("half");
+    const down=sheetSnapPx("down");
     let t=startTop+dy;
-    if(t>half) t=half+(t-half)*0.25;                             // rubber-band below the classic split
-    applySheetTop(Math.max(0,t), false);
+    if(t<0) t=t*0.3;                                             // soft overshoot above full
+    if(t>down) t=down+(t-down)*0.3;                              // soft overshoot below down
+    applySheetTop(t, false);
   },{passive:false});
   m.addEventListener("touchend",()=>{
     if(!dragging){ mode=null; return; }
     mode=null; dragging=false;
-    const proj=sheetCurTop()+vel*220;                            // velocity bias
-    const snaps=["full","half"].map(n=>({n,px:sheetSnapPx(n)}));
-    let best=snaps[0]; for(const s of snaps) if(Math.abs(s.px-proj)<Math.abs(best.px-proj)) best=s;
+    const vcap=Math.max(-2.2, Math.min(2.2, vel));               // bounded flick power
+    let proj=sheetCurTop()+vcap*220;                             // velocity bias
+    proj=Math.max(0, Math.min(sheetSnapPx("down"), proj));       // clamp: overshoot must favour the extremes, not the middle
+    // half is the preferred home — its distance is discounted so ties (and near-ties) snap there
+    const snaps=[{n:"full",w:1},{n:"half",w:0.55},{n:"down",w:1}].map(o=>({n:o.n,px:sheetSnapPx(o.n),w:o.w}));
+    let best=snaps[0], bd=Infinity;
+    for(const sn of snaps){ const dd=Math.abs(sn.px-proj)*sn.w; if(dd<bd){ bd=dd; best=sn; } }
     setSheet(best.n,true);
   },{passive:true});
 }
