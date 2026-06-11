@@ -22,7 +22,7 @@
     --bg:#f4f5f0; --card:#ffffff; --ink:#14160f; --muted:#70756a; --faint:#9aa093;
     --line:#e7e9e1; --line-strong:#d6d9cd;
     --accent:#c4f53d; --accent-deep:#5f8b06; --accent-soft:#eef9c9;
-    --blue:#2f6fed; --violet:#7c5cf0; --amber:#e08a00; --green:#11936a; --red:#e0483d; --teal:#0e9aa0; --grey:#7b8071;
+    --blue:#2f6fed; --amber:#e08a00; --green:#11936a; --red:#e0483d;
     --shadow:0 1px 2px rgba(20,22,15,.04), 0 6px 20px rgba(20,22,15,.05);
     --radius:15px; --head-h:64px; --bar-h:56px;
     /* bottom inset for the tab bar: hug the home indicator (shave 8px, never below 6px) */
@@ -140,10 +140,6 @@
   .pager{overflow:hidden; position:relative}
   .pager-track{display:flex; will-change:transform}
   .daypage{flex:0 0 100%; padding:8px 16px 18px; min-width:0}
-  .daytitle{display:flex; align-items:baseline; gap:10px; margin:6px 2px 14px; flex-wrap:wrap}
-  .daytitle .dbig{font-size:21px; font-weight:700; letter-spacing:-.015em}
-  .daytitle .dsub{color:var(--muted); font-size:12.5px}
-  .daytitle .dtz{font-size:10.5px; color:var(--accent-deep); background:var(--accent-soft); padding:2px 8px; border-radius:20px; font-weight:600}
   .countdown{display:flex; align-items:center; gap:12px; background:linear-gradient(135deg, var(--ink), #2a2e22); color:#fff; border-radius:14px; padding:14px 16px; margin-bottom:14px}
   .countdown .num{font-size:30px; font-weight:700; color:var(--accent); line-height:1}
   .countdown .ct{font-size:13px; color:#d4d8c8}
@@ -207,7 +203,6 @@
   .loc{display:flex; align-items:flex-start; gap:7px; margin-top:7px; font-size:13.5px; color:var(--ink)}
   .loc .pin{color:var(--red); flex:none; margin-top:1px}
   .loc .addr{color:var(--muted); font-size:12.5px}
-  .loc-actions{display:inline-flex; gap:4px; margin-left:2px; vertical-align:middle}
   .chiprow{display:flex; gap:6px; flex-wrap:wrap; margin-top:9px}
   .chip{display:inline-flex; align-items:center; gap:5px; font-size:12px; padding:3px 9px; border-radius:8px; background:var(--bg); border:1px solid var(--line); color:var(--muted)}
   .chip.doc{cursor:pointer; color:var(--ink)} .chip.doc:hover{border-color:var(--accent-deep); color:var(--accent-deep)}
@@ -237,9 +232,6 @@
 
   /* ---------- Documents ---------- */
   .doc-body{padding:14px 18px 20px}
-  .drive{display:flex; align-items:center; gap:12px; padding:14px; border:1px solid var(--line); border-radius:13px; background:linear-gradient(180deg,#fff, var(--bg)); margin-bottom:14px}
-  .drive .gic{width:42px;height:42px;border-radius:11px;background:#fff;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:20px;flex:none}
-  .drive .t{font-weight:700} .drive .s{font-size:12.5px;color:var(--muted)}
   .doc-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px}
   .doccard{display:flex; gap:10px; padding:12px; border:1px solid var(--line); border-radius:12px; background:var(--card); position:relative}
   .doccard:hover{border-color:var(--line-strong); box-shadow:var(--shadow)}
@@ -287,7 +279,6 @@
   .geo-results button:hover{background:var(--bg)}
   .loc-pick{font-size:12.5px; color:var(--green); margin-top:6px; display:none}
   .loc-pick.show{display:flex; align-items:center; gap:6px}
-  .checklist{display:flex; flex-direction:column; gap:6px; max-height:160px; overflow:auto; border:1px solid var(--line); border-radius:10px; padding:8px}
   .checklist label{display:flex; align-items:center; gap:9px; font-weight:400; font-size:13.5px; padding:3px}
   .subsec{border:1px solid var(--line); border-radius:12px; padding:12px; margin-top:6px; background:var(--bg)}
   .subsec h4{margin:0 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted)}
@@ -368,21 +359,13 @@
   .daypill .dd{font-size:16px}
 
   /* tap-to-open detail view */
-  .detail{position:fixed; inset:0; z-index:120; background:var(--bg); display:none}
-  .detail.show{display:flex}
-  .detail-inner{position:relative; display:flex; flex-direction:column; width:100%; min-height:0}
   .detail-map{flex:0 0 42%; min-height:190px; width:100%; background:#dfe3d8}
-  .detail-close{position:absolute; top:calc(env(safe-area-inset-top) + 12px); right:14px; z-index:5; width:38px;height:38px;border-radius:50%; background:rgba(255,255,255,.92); backdrop-filter:blur(8px); box-shadow:0 2px 10px rgba(0,0,0,.22); font-size:17px; display:flex;align-items:center;justify-content:center}
-  .detail-body{flex:1 1 0; overflow-y:auto; -webkit-overflow-scrolling:touch; background:var(--card); border-radius:22px 22px 0 0; margin-top:-22px; position:relative; z-index:2; padding:22px 18px calc(28px + env(safe-area-inset-bottom))}
   .detail-body .dh{display:flex; align-items:center; gap:11px; margin-bottom:6px}
   .detail-body .de{font-size:27px}
   .detail-body .dt{font-size:21px; font-weight:700; letter-spacing:-.015em; flex:1; min-width:0}
   .detail-sec{margin-top:16px}
   .detail-sec h4{margin:0 0 7px; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted)}
   @media(min-width:860px){
-    .detail{align-items:center; justify-content:center; padding:30px; background:rgba(20,22,15,.42); backdrop-filter:blur(3px)}
-    .detail-inner{width:min(560px,100%); max-height:88vh; background:var(--card); border-radius:20px; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.3)}
-    .detail-body{border-radius:0; margin-top:0}
   }
 
   /* passcode lock */
@@ -650,11 +633,6 @@
   <button data-view="settings"><span class="ti">⚙︎</span><span>Settings</span></button>
 </nav>
 
-<div class="detail" id="detail"><div class="detail-inner">
-  <div class="detail-map" id="detailMap"></div>
-  <button class="detail-close" data-act="closeDetail">✕</button>
-  <div class="detail-body" id="detailBody"></div>
-</div></div>
 
 <div class="lock" id="lock"><div class="lockbox">
   <div class="lock-emoji">🔒</div>
@@ -679,7 +657,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r56";
+const APP_BUILD = "12 Jun 2026 · r57";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -738,7 +716,7 @@ function flavorEmoji(it){ if(!it) return "📍"; if(it.emoji) return it.emoji;
 const TZ_ABBR = {"Asia/Makassar":"WITA","Asia/Jakarta":"WIB","Asia/Jayapura":"WIT","Asia/Singapore":"SGT","Asia/Dubai":"GST","Australia/Sydney":"AEST"};
 
 let state = load();
-let ui = { view:"today", selId:null, dayIdx:null, expandedId:null, itinMode:(localStorage.getItem("indoTrip.itinMode")==="all"?"all":"day") };
+let ui = { view:"today", dayIdx:null, expandedId:null, itinMode:(localStorage.getItem("indoTrip.itinMode")==="all"?"all":"day") };
 const legCache = new Map();
 let googleReady=false, googleLoading=false;
 let focusDayKey=null;
@@ -832,7 +810,6 @@ function wallToInstant(dateStr,timeStr,tz){ if(!dateStr) return null;
 function fmtTime(inst,tz){ if(!inst) return ""; const h12=state.meta.clock==="12"; const t=new Intl.DateTimeFormat("en-GB",{timeZone:tz,hour:h12?"numeric":"2-digit",minute:"2-digit",hour12:h12}).format(inst); return h12?t.replace(" ","\u2009"):t; }
 function fmtDateFull(inst,tz){ return inst?new Intl.DateTimeFormat("en-GB",{timeZone:tz,weekday:"long",day:"numeric",month:"long"}).format(inst):""; }
 function fmtDateShort(inst,tz){ return inst?new Intl.DateTimeFormat("en-GB",{timeZone:tz,weekday:"short",day:"numeric",month:"short"}).format(inst):""; }
-function fmtDateShort(inst,tz){ return inst?new Intl.DateTimeFormat("en-GB",{timeZone:tz,weekday:"short",day:"numeric",month:"short"}).format(inst):""; }
 function fmtWeekday(inst,tz){ return inst?new Intl.DateTimeFormat("en-GB",{timeZone:tz,weekday:"short"}).format(inst):""; }
 function fmtDayNum(inst,tz){ return inst?new Intl.DateTimeFormat("en-GB",{timeZone:tz,day:"numeric"}).format(inst):""; }
 function fmtMonth(inst,tz){ return inst?new Intl.DateTimeFormat("en-GB",{timeZone:tz,month:"short"}).format(inst):""; }
@@ -912,7 +889,6 @@ function applyMapFocus(key){ focusDayKey=key; refreshMap(); }
 function locsOf(it){ const pts=[]; [it&&it.fromLoc, it&&it.toLoc, it&&it.location].forEach(l=>{ if(l&&l.lat!=null) pts.push(L.latLng(l.lat,l.lng)); }); return pts; }
 function focusItem(id){
   const it = state.items.find(x=>x.id===id) || (state.hotspots||[]).find(x=>x.id===id);
-  ui.selId=id;
   if(isMobile() && ui.view!=="today"){ setView("today"); }
   if(!it) return;
   if(isMobile() && sheetViews() && sheet.state==="full") setSheet("half",true); // bring the map into view
@@ -936,51 +912,6 @@ function focusItem(id){
 
 /* ---- tap-to-open detail view ---- */
 let detailMap=null;
-function openDetail(id){
-  const it=state.items.find(x=>x.id===id) || (state.hotspots||[]).find(x=>x.id===id);
-  if(!it) return;
-  const t=TYPES[it.type]||TYPES.note;
-  const _dseen=new Set(); const docs=[...(it.docIds||[]).map(x=>state.docs.find(d=>d.id===x)), ...state.docs.filter(d=>d.itemId===it.id)].filter(d=>d&&!_dseen.has(d.id)&&_dseen.add(d.id));
-  const locsHtml=(it.fromLoc||it.toLoc)?(locLineHTML(it,it.fromLoc,"from")+locLineHTML(it,it.toLoc,"to")):locLineHTML(it,it.location,"main");
-  $("#detailBody").innerHTML=`
-    <div class="dh"><span class="de">${t.emoji}</span><span class="dt">${esc(it.title||t.label)}</span></div>
-    ${whenHTML(it)}
-    ${locsHtml?`<div class="detail-sec"><h4>Location</h4>${locsHtml}</div>`:""}
-    ${it.conf?`<div class="detail-sec"><h4>Booking ref</h4><span class="mono">${esc(it.conf)}</span> <button class="iconbtn" style="width:24px;height:24px;vertical-align:-6px" data-act="copy-conf" data-id="${it.id}">⧉</button></div>`:""}
-    ${it.notes?`<div class="detail-sec"><h4>Notes</h4><div class="notes">${esc(it.notes)}</div></div>`:""}
-    ${docs.length?`<div class="detail-sec"><h4>Documents</h4><div class="chiprow">${docs.map(d=>`<span class="chip doc" data-act="opendoc" data-url="${esc(d.url)}">📎 ${esc(d.title)}</span>`).join("")}</div></div>`:""}
-    <div class="detail-sec" style="display:flex;gap:10px;margin-top:24px">
-      <button class="btn lime" data-act="edit" data-id="${it.id}">✎ Edit</button>
-      <button class="btn ghost" data-act="closeDetail">Close</button>
-    </div>`;
-  $("#detail").classList.add("show");
-  if(detailMap){ try{detailMap.remove();}catch(e){} detailMap=null; }
-  const pts=[];
-  [it.fromLoc,it.toLoc,it.location].forEach(l=>{ if(l&&l.lat!=null) pts.push([l.lat,l.lng]); });
-  const mapEl=$("#detailMap");
-  if(!pts.length){ mapEl.style.display="none"; return; }
-  mapEl.style.display="";
-  setTimeout(()=>{
-    detailMap=L.map("detailMap",{zoomControl:false,attributionControl:false,scrollWheelZoom:false}).setView(pts[0],14);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{maxZoom:19,subdomains:"abcd"}).addTo(detailMap);
-    pts.forEach(p=>L.marker(p,{icon:pinIcon(it.type)}).addTo(detailMap));
-    if(pts.length>1){ try{ detailMap.fitBounds(L.latLngBounds(pts).pad(.4)); }catch(e){} }
-    detailMap.invalidateSize();
-  },60);
-}
-function closeDetail(){ $("#detail").classList.remove("show"); if(detailMap){ try{detailMap.remove();}catch(e){} detailMap=null; } }
-/* inline expand of a timeline card + sync the map */
-// Idempotent so a double-fire can't toggle it back: body-tap always expands, chevron collapses.
-function cssEsc(s){ return (window.CSS&&CSS.escape)?CSS.escape(s):String(s).replace(/"/g,'\\"'); }
-function setCardExpanded(id,on){
-  const el=document.querySelector('.tl-card[data-card="'+cssEsc(id)+'"]'); if(!el) return;
-  el.classList.toggle('expanded',on);
-  const row=el.closest('.tl-row'); if(row) row.classList.toggle('rowexp',on);
-  const exp=el.querySelector('.tl-expand'); if(!exp) return;
-  if(on){ exp.style.maxHeight=exp.scrollHeight+'px'; clearTimeout(exp._t); exp._t=setTimeout(()=>{ if(el.classList.contains('expanded')) exp.style.maxHeight='none'; },360); }
-  else { exp.style.maxHeight=exp.scrollHeight+'px'; void exp.offsetHeight; exp.style.maxHeight='0px'; }
-}
-let _tapId=null,_tapT=0;
 function toggleItem(id){
   if(!id) return;
   const now=Date.now();
@@ -991,7 +922,7 @@ function toggleItem(id){
 function expandItem(id){
   if(!id) return;
   if(ui.expandedId && ui.expandedId!==id) setCardExpanded(ui.expandedId,false);
-  ui.expandedId=id; ui.selId=id;
+  ui.expandedId=id;
   setCardExpanded(id,true);          // animates to the content's real height
   focusItem(id);
 }
@@ -1275,7 +1206,7 @@ function dayTimelineHTML(d,todayKey){
   }
   return (items.length||conts.length)? `<div class="tl">${rows.map(r=>r.html).join("")}</div>` : `<div class="freeday">🌴 No plans — free day</div>`;
 }
-function durShort(ms){ const m=Math.max(1,Math.round(ms/60000)); const h=Math.floor(m/60); return h? h+"h "+String(m%60).padStart(2,"0")+"m" : m+"m"; }
+function durShort(ms){ return durText(Math.max(60000,ms||0)); }
 function upNextHTML(d,todayKey){
   if(d.key!==todayKey) return "";
   const now=Date.now();
@@ -1296,15 +1227,18 @@ function dayZonesLabel(d){
   const seen=[]; (d.items||[]).forEach(it=>{ [startTz(it), endTz(it)].forEach(z=>{ if(!z) return; const ab=tzAbbr(z); if(!seen.includes(ab)) seen.push(ab); }); });
   return seen.slice(0,3).join(" → ") || tzAbbr(d.tz);
 }
+function addWrapHTML(dateKey){
+  return `<div class="addwrap">
+    <div class="addbar">
+      <button type="button" class="addbar-q" data-act="qaExpand" data-date="${dateKey}">✨ Quick add</button>
+      <button type="button" class="addbar-i" data-act="importDoc" data-date="${dateKey}">✨ Import</button>
+    </div>
+    <form class="qadd" data-date="${dateKey}" autocomplete="off"><input class="qadd-in" type="text" enterkeyhint="done" placeholder="19:30 dinner at Locavore"><button class="qadd-go" type="submit" aria-label="Add">↵</button></form>
+  </div>`;
+}
 function dayPage(d,idx,total,todayKey){
   const copyBtn = d.items.length? `<div class="copyday-wrap"><button class="btn ghost sm" data-act="copyDay" data-date="${d.key}">⧉ Copy day as text</button></div>` : "";
-  const qadd=`<div class="addwrap">
-    <div class="addbar">
-      <button type="button" class="addbar-q" data-act="qaExpand" data-date="${d.key}">✨ Quick add</button>
-      <button type="button" class="addbar-i" data-act="importDoc" data-date="${d.key}">🎫 Import</button>
-    </div>
-    <form class="qadd" data-date="${d.key}" autocomplete="off"><input class="qadd-in" type="text" enterkeyhint="done" placeholder="19:30 dinner at Locavore"><button class="qadd-go" type="submit" aria-label="Add">↵</button></form>
-  </div>`;
+  const qadd=addWrapHTML(d.key);
   return `<div class="daypage" data-page="${idx}">${idx===0?countdownHTML(tripDays()):""}${upNextHTML(d,todayKey)}${dayTimelineHTML(d,todayKey)}${ghostRowsHTML(d)}${qadd}${copyBtn}</div>`;
 }
 function tlRow(it,isLast){
@@ -1414,30 +1348,6 @@ function whenHTML(it){ const sTz=startTz(it),eTz=endTz(it); const si=startInstan
   let endStr=""; if(ei){ const sameDay=dayKey(si,sTz)===dayKey(ei,eTz); endStr=sameDay?" – "+fmtTime(ei,eTz):" → "+fmtDateShort(ei,eTz)+" "+fmtTime(ei,eTz); }
   return `<div class="when"><span class="time mono">${fmtTime(si,sTz)}${endStr}</span><span class="tz">${esc(tzAbbr(sTz))}</span>${homeEq}</div>`;
 }
-function itemCard(it){ const t=TYPES[it.type]||TYPES.note; const docs=(it.docIds||[]).map(id=>state.docs.find(d=>d.id===id)).filter(Boolean); const sel=ui.selId===it.id?" sel":"";
-  let locs = (it.fromLoc||it.toLoc)?(locLineHTML(it,it.fromLoc,"from")+locLineHTML(it,it.toLoc,"to")):locLineHTML(it,it.location,"main");
-  return `<div class="card${sel}" data-card="${it.id}">
-    <div class="ic">${t.emoji}</div>
-    <div class="body">
-      <div class="row1"><span class="ttl">${esc(it.title||t.label)}</span><span class="tag" style="background:${TYPE_HEX[it.type]||'#0e9aa0'}">${t.label}</span></div>
-      ${whenHTML(it)}${locs}
-      ${it.conf?`<div class="chiprow"><span class="chip"><span class="k">Ref</span> <span class="mono">${esc(it.conf)}</span><button class="iconbtn" style="width:22px;height:22px" title="Copy ref" data-act="copy-conf" data-id="${it.id}">⧉</button></span></div>`:""}
-      ${docs.length?`<div class="chiprow">${docs.map(d=>`<span class="chip doc" data-act="opendoc" data-url="${esc(d.url)}">📎 ${esc(d.title)}</span>`).join("")}</div>`:""}
-      ${(it.files&&it.files.length)?`<div class="chiprow">${it.files.map(f=>`<a class="chip doc" href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name)}</a>`).join("")}</div>`:""}
-      ${it.notes?`<div class="notes">${esc(it.notes)}</div>`:""}
-    </div>
-    <button class="iconbtn edit" title="Edit" data-act="edit" data-id="${it.id}">✎</button></div>`;
-}
-function legHTML(a,b){ const lg=legInfo(a,b); if(!lg) return "";
-  const tight=lg.gapMs!=null && lg.gapMs<lg.estMin*60000*1.3;
-  if(googleReady) setTimeout(()=>fetchLeg(lg.id,lg.o,lg.d,lg.departInst),0); else if(getMapsKey()) loadGoogle();
-  return `<div class="leg"><div class="legcard">
-    <div class="lr"><span class="mode">🚗</span><span><b>${lg.km.toFixed(lg.km<10?1:0)} km</b> to next stop</span>
-      ${lg.gapMs!=null?`<span class="gap${tight?" tight":""}">${tight?"⚠ tight — ":""}${lg.gapMs<0?"overlaps connection":durText(lg.gapMs)+" to connect"}</span>`:""}</div>
-    <div class="live leglive-${lg.id}">${googleReady?'<span class="spin"></span> <span style="color:var(--muted)">fetching live time…</span>':`<span class="badge-est">estimate</span> <span class="v">~${durText(lg.estMin*60000)} by car</span> <span style="color:var(--faint)">· straight-line ${lg.km.toFixed(1)} km</span>`}</div>
-    <div class="leg-links"><a href="${lg.gmapDir}" target="_blank" rel="noopener">↗ Open route in Google Maps (live + predicted)</a></div>
-  </div></div>`;
-}
 function renderItinerary(){
   const days=tripDays();
   const todayKey=dayKey(new Date(),state.meta.destTz);
@@ -1455,6 +1365,7 @@ function renderItinerary(){
       const isToday=d.key===todayKey;
       html+=`<div class="daybar${isToday?" istoday":""}" data-dbkey="${d.key}"><span class="d">${esc(fmtDateFull(d.instant,d.tz))}</span><span class="ln"></span><span class="wx" data-wxdate="${d.key}" style="display:none"></span><span class="dtz">${esc(dayZonesLabel(d))}</span>${d.items.length?`<button class="iconbtn" data-act="copyDay" data-date="${d.key}" title="Copy day as text">⧉</button>`:""}</div>`;
       html+=dayTimelineHTML(d,todayKey);
+      html+=addWrapHTML(d.key);
     });
   }
   $("#main").innerHTML=html+`</div>`;
@@ -1668,7 +1579,7 @@ function openCreateMenu(){
     <button class="create-opt" data-act="newItem"><span class="e">🗓️</span>Itinerary item</button>
     <button class="create-opt" data-act="newHotspot"><span class="e">📍</span>Hotspot</button>
     <button class="create-opt" data-act="newDoc"><span class="e">📎</span>Document</button>
-    <button class="create-opt" data-act="importDoc"><span class="e">✨</span>Import from ticket / booking</button>
+    <button class="create-opt" data-act="importDoc"><span class="e">✨</span>Import</button>
   </div></div>`);
 }
 function renderHotspotMarkers(){
@@ -2074,7 +1985,7 @@ function itemModal(item){
     <div class="mb">
       <div class="field"><label>Type</label><div class="typegrid" id="typeGrid">${typeBtns}</div></div>
       ${(FLAVORS[draft.type]||[]).length>1?`<div class="field"><label>Icon <span class="hint" style="display:inline">— auto from the title, tap to override</span></label><div class="flavrow" id="flavRow"><button type="button" class="fchip${!draft.emoji?" on":""}" data-act="flavor" data-e="">✨ auto</button>${FLAVORS[draft.type].map(e=>`<button type="button" class="fchip${draft.emoji===e?" on":""}" data-act="flavor" data-e="${e}">${e}</button>`).join("")}</div></div>`:""}
-      <button type="button" class="paste-conf" data-act="importFill">✨ Auto-fill from a ticket, booking or screenshot</button>
+      <button type="button" class="paste-conf" data-act="importFill">✨ Import — fill from a ticket or booking</button>
       <div class="field"><label>Title</label><input class="inp" id="f-title" value="${esc(draft.title)}" placeholder="${isLeg?"e.g. Flight QR1 LHR → DPS":"e.g. Snorkelling · Blue Lagoon"}"></div>
       <div class="row2"><div class="field"><label>${isLeg?"Departure date":"Date"}</label><input class="inp" type="date" id="f-date" value="${esc(draft.date||"")}"></div>
         <div class="field"><label>${isLeg?"Departure time":"Time"}</label><input class="inp" type="time" id="f-time" value="${esc(draft.time||"")}"></div></div>
@@ -2252,7 +2163,7 @@ function saveDoc(){
   added.forEach(d=>{ state.docs.push(d); syncSet("docs/"+d.id,d); });
   save(); closeModal(); renderMain(); toast(added.length+" document"+(added.length===1?"":"s")+" added",true);
 }
-function exportData(){ const code=btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+function exportData(){ const safe={...state, meta:{...state.meta, aiKey:undefined}}; const code=btoa(unescape(encodeURIComponent(JSON.stringify(safe))));
   openModal(`<div class="mh"><h3>Share / backup</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
   <div class="mb"><div class="field"><label>Share code</label><textarea class="inp mono" id="exp" style="min-height:120px" readonly>${esc(code)}</textarea><div class="hint">Send to Elisa → she opens the app → Settings → Import → paste.</div></div>
   <div style="display:flex;gap:10px"><button class="btn lime sm" data-act="copyExp">⧉ Copy code</button><button class="btn ghost sm" data-act="downloadExp">⤓ Download file</button></div></div>`); }
@@ -2326,7 +2237,7 @@ document.addEventListener("click",e=>{
       if(pp.place&&(!draft.location||draft.location.lat==null)){ draft._tmp=draft._tmp||{}; /* geocode after save via airports? simpler: stash as location name for Places search */ draft.location={name:String(pp.place)}; draft._placeQuery=String(pp.place); }
       const srcFiles=importCtx.files.slice();
       itemModal(draft);
-      toast("✨ Filled — check & save"+(importCtx.proposals.length>1?" ("+(importCtx.proposals.length-1)+" more in 🎫 Import)":""),true);
+      toast("✨ Filled — check & save"+(importCtx.proposals.length>1?" ("+(importCtx.proposals.length-1)+" more via ✨ Import on the day)":""),true);
       if(srcFiles.length) setTimeout(()=>{ try{ handleItemFiles(srcFiles); }catch(e){} },150);
       break; }
     case "qaExpand": { const w=a.closest(".addwrap"); if(!w) break; w.querySelector(".addbar").style.display="none"; const f=w.querySelector(".qadd"); f.classList.add("open"); setTimeout(()=>{ try{ f.querySelector("input").focus(); }catch(e){} },30); break; }
@@ -2376,14 +2287,12 @@ document.addEventListener("click",e=>{
     case "newDoc": closeModal(); docModal(); break;
     case "togglePills": { const s=$("#daystrip"); if(s){ s.classList.toggle("collapsed"); $("#datebar")?.classList.toggle("open", !s.classList.contains("collapsed")); } break; }
     case "goToday": { if(pagerCtl){ pagerCtl.setTo(currentDayIndex(pagerCtl.days),true); $("#daystrip")?.classList.add("collapsed"); $("#datebar")?.classList.remove("open"); } break; }
-    case "edit": closeDetail(); itemModal(state.items.find(x=>x.id===id)); break;
-    case "closeDetail": closeDetail(); break;
+    case "edit": itemModal(state.items.find(x=>x.id===id)); break;
     case "setPass": { const v=($("#passInput").value||"").trim(); if(!v){ toast("Type a code first"); break; } state.meta.passHash=hashCode(v); save(); pushMeta(); localStorage.setItem("indoTrip.unlock", state.meta.passHash); renderSettings(); toast("Passcode set",true); break; }
     case "clearPass": state.meta.passHash=""; save(); pushMeta(); localStorage.removeItem("indoTrip.unlock"); renderSettings(); toast("Passcode removed",true); break;
     case "saveItem": saveItem(); break;
     case "delItem": if(confirm("Delete this item?")){ state.items=state.items.filter(x=>x.id!==id); save(); syncRemove("items/"+id); closeModal(); refreshMap(); renderMain(); toast("Deleted",true);} break;
     case "closeModal": closeModal(); break;
-    case "focus": focusItem(id); break;
     case "copy-loc": { const it=state.items.find(x=>x.id===id),role=a.dataset.role; const loc=role==="from"?it.fromLoc:role==="to"?it.toLoc:it.location; copy(loc.address||loc.name||""); break; }
     case "copy-conf": { const it=state.items.find(x=>x.id===id); copy(it.conf||""); break; }
     case "opendoc": window.open(a.dataset.url,"_blank","noopener"); break;
@@ -2463,7 +2372,7 @@ initFirebase();
 checkLock();
 $("#lockBtn").addEventListener("click",tryUnlock);
 $("#lockInput").addEventListener("keydown",e=>{ if(e.key==="Enter") tryUnlock(); });
-document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if($("#detail").classList.contains("show")) closeDetail(); else if($("#scrim").classList.contains("show")) closeModal(); } });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&$("#scrim").classList.contains("show")) closeModal(); });
 setInterval(renderClocks,1000*20);
 setInterval(()=>{ if(ui.view==="today"){ const days=tripDays(); if(days[ui.dayIdx]?.key===dayKey(new Date(),state.meta.destTz)) renderToday(); } },60000);
 document.fonts?.ready.then(()=>{ syncHeadH(); });
