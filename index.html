@@ -642,7 +642,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r42";
+const APP_BUILD = "11 Jun 2026 · r43";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1778,8 +1778,9 @@ function renderSettings(){ const m=state.meta; const ownKey=!!(m.mapsKey||"").tr
         <li>Recommended: restrict the key to HTTP referrer <code>henri-cmd.github.io/*</code> (and <code>localhost</code> for testing).</li>
       </ol>Google’s free monthly credit easily covers a personal trip.</div></details>
     </div>
-    <div class="field"><label>Live sync <span class="keystatus off" id="syncBadge">○ offline</span></label>
-      <div class="hint">Your trip syncs live between devices. Send Elisa the invite link and she'll see everything — and every edit — in real time on her phone.</div>
+    <div class="field"><label>Live sync <span class="keystatus off" id="syncBadge">○ offline</span> <span class="keystatus" style="background:var(--bg);border-color:var(--line)">trip <span class="mono">${esc((tripId||"?").slice(0,8))}</span></span></label>
+      <div class="hint">Your trip syncs live between devices. Send Elisa the invite link and she'll see everything — and every edit — in real time on her phone. <b>Both devices must show the same trip code</b> — if not, paste the invite link below to join.</div>
+      <div style="display:flex;gap:8px;margin-top:8px"><input class="inp" id="joinLink" placeholder="Paste an invite link to JOIN that trip…" style="flex:1;min-width:0"><button class="btn ghost sm" data-act="joinTrip" style="align-self:stretch">Join</button></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
         <button class="btn lime sm" data-act="invite">🔗 Copy invite link for Elisa</button>
         <button class="btn ghost sm" data-act="export">⤓ Backup code</button>
@@ -1793,7 +1794,7 @@ function renderSettings(){ const m=state.meta; const ownKey=!!(m.mapsKey||"").tr
         ${state.meta.passHash?`<button class="btn danger sm" data-act="clearPass">Remove</button>`:""}
       </div>
       <div class="hint">A lock screen when the app opens, shared with Elisa. Soft (client-side) protection — keeps casual eyes out.</div></div>
-    <div class="field"><label>Install</label><div class="hint">On iPhone: Safari → Share → <b>Add to Home Screen</b> to launch INDO 2026 full-screen like a real app.</div>
+    <div class="field"><label>Install</label><div class="hint">On iPhone: open <b>your invite link</b> in Safari first, then Share → <b>Add to Home Screen</b> — that way the installed app is connected to the same shared trip.</div>
       <div class="hint" style="margin-top:6px">Build <span class="mono">${esc(APP_BUILD)}</span> — if a fix doesn't show, fully close and reopen the app.</div>
       <div class="hint" style="margin-top:4px">Viewport <span class="mono">${innerWidth}×${innerHeight}</span> of <span class="mono">${screen.width}×${screen.height}</span> · vv <span class="mono">${window.visualViewport?Math.round(visualViewport.height):"?"}</span> · gap <span class="mono">${getComputedStyle(document.documentElement).getPropertyValue("--vv-meas")||"0px"}</span> ·insets <span class="mono">${(()=>{const d=document.createElement("div");d.style.cssText="position:fixed;left:-9999px;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)";document.body.appendChild(d);const c=getComputedStyle(d);const v="t"+(parseFloat(c.paddingTop)||0)+" b"+(parseFloat(c.paddingBottom)||0);d.remove();return v;})()}</span> · ${navigator.standalone?"standalone":"browser"} · ${(navigator.userAgent.match(/OS (\d+)[._](\d+)/)||[]).slice(1).join(".")||"?"}</div></div>
   </div>`;
@@ -2112,6 +2113,13 @@ document.addEventListener("click",e=>{
       save(); syncRemove("docs/"+id); pushItems(); renderMain(); } break;
     case "rmDocFile": { const i=+a.dataset.i; if(draft&&draft._dfiles){ const f=draft._dfiles.splice(i,1)[0]; if(f&&fstore&&/firebasestorage/.test(f.url||"")){ try{ fstore.refFromURL(f.url).delete().catch(()=>{}); }catch(e){} } renderDocFileChips(); } break; }
     case "invite": copy(inviteLink()); toast("Invite link copied — send it to Elisa",true); break;
+    case "joinTrip": { const v=($("#joinLink").value||"").trim(); const m=v.match(/[#?&]t=([A-Za-z0-9_-]{6,})/)||v.match(/^([A-Za-z0-9_-]{6,})$/);
+      if(!m){ toast("That doesn't look like an invite link"); break; }
+      const nid=m[1];
+      if(nid===tripId){ toast("Already on that trip ✓",true); break; }
+      if(!confirm("Join trip "+nid.slice(0,8)+"…? This device will switch to the shared trip (its own unsynced data will be left behind).")) break;
+      localStorage.setItem("indoTrip.tripId", nid); localStorage.removeItem(STORE_KEY);
+      location.hash="t="+nid; location.reload(); break; }
     case "export": exportData(); break;
     case "copyExp": copy($("#exp").value); break;
     case "downloadExp": { const blob=new Blob([$("#exp").value],{type:"text/plain"}); const u=URL.createObjectURL(blob); const x=document.createElement("a"); x.href=u; x.download="indo-2026-backup.txt"; x.click(); URL.revokeObjectURL(u); break; }
