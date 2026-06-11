@@ -575,7 +575,7 @@
   /* Day / All segmented toggle (Itinerary tab) */
   .itinbar{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 16px 6px}
   .ititle{flex:1; min-width:0}
-  .ibig{font-size:21px; font-weight:800; letter-spacing:-.015em; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .ibig{font-size:19px; font-weight:800; color:var(--ink); letter-spacing:-.015em; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .isub{font-size:12px; color:var(--muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
   .sec-head.itinhead{align-items:center}
   .segtoggle{display:inline-flex; background:var(--bg); border:1px solid var(--line); border-radius:11px; padding:2px; gap:2px}
@@ -662,7 +662,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "11 Jun 2026 · r50";
+const APP_BUILD = "11 Jun 2026 · r51";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1392,7 +1392,7 @@ function renderItinerary(){
     const f=(d,withM)=>new Intl.DateTimeFormat("en-GB",{timeZone:d.tz,day:"numeric",...(withM?{month:"short"}:{})}).format(d.instant);
     const sameM=new Intl.DateTimeFormat("en-GB",{timeZone:a.tz,month:"short"}).format(a.instant)===new Intl.DateTimeFormat("en-GB",{timeZone:b.tz,month:"short"}).format(b.instant);
     return `${sameM?f(a,false):f(a,true)} – ${f(b,true)} · ${days.length} day${days.length===1?"":"s"}`; })();
-  let html=`<div class="sheet-grip"></div><div class="itinbar"><div class="ititle"><div class="ibig" id="itBig">Itinerary</div><div class="isub" id="itSub">${esc(dr)}</div></div>${itinToggleHTML()}</div><div class="it-body alltl">`;
+  let html=`<div class="sheet-grip"></div><div class="itinbar"><div class="ititle"><div class="ibig">Trip itinerary</div><div class="isub" id="itSub">${esc(dr)}</div></div>${itinToggleHTML()}</div><div class="it-body alltl">`;
   if(!days.length){
     html+=`<div class="empty"><div class="big">🌴</div><h3>Plan your Indonesia trip</h3><p>Add flights, hotels, transfers and activities.<br>Each shows on the map with copyable addresses, local times and live travel times.</p>
       <div class="cta"><button class="btn lime" data-act="add">＋ Add first item</button><button class="btn ghost" data-act="addExample">Load a Bali example</button></div></div>`;
@@ -1411,12 +1411,12 @@ function renderItinerary(){
 }
 function updateItinHeader(){
   if(!(ui.view==="today"&&ui.itinMode==="all")) return;
-  const big=$("#itBig"), sub=$("#itSub"), bar=document.querySelector(".itinbar"); if(!big||!bar) return;
+  const sub=$("#itSub"), bar=document.querySelector(".itinbar"); if(!sub||!bar) return;
   const bars=[...document.querySelectorAll('.daybar[data-dbkey]')]; if(!bars.length) return;
   const edge=bar.getBoundingClientRect().bottom+8;
   let cur=-1; bars.forEach((b,i)=>{ if(b.getBoundingClientRect().top<=edge) cur=i; });
-  if(cur<0){ big.textContent="Itinerary"; sub.textContent=updateItinHeader._range||""; }
-  else { const d=tripDays()[cur]; if(!d) return; big.textContent=fmtDateShort(d.instant,d.tz); sub.textContent=`Day ${cur+1}/${bars.length}`; }
+  if(cur<0){ sub.textContent=updateItinHeader._range||""; }
+  else { const d=tripDays()[cur]; if(!d) return; sub.textContent=`${fmtDateShort(d.instant,d.tz)} · Day ${cur+1}/${bars.length}`; }
 }
 let _ihRaf=null;
 function bindItinHeaderScroll(){
