@@ -243,14 +243,14 @@
 
   /* ---------- Settings ---------- */
   .set-body{padding:6px 18px 22px}
-  .field{margin:15px 0}
-  .field label{display:block; font-weight:600; font-size:13.5px; margin-bottom:5px}
-  .field .hint{font-size:12px; color:var(--muted); margin-top:4px}
-  .inp{width:100%; padding:11px 12px; border:1px solid var(--line-strong); border-radius:10px; background:#fff}
+  .field{margin:10px 0}
+  .field label{display:block; font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-bottom:4px}
+  .field label .hint,.field label .keystatus{text-transform:none; letter-spacing:0}
+  .field .hint{font-size:11px; color:var(--muted); margin-top:4px}
+  .inp{width:100%; padding:8px 11px; border:1px solid var(--line-strong); border-radius:10px; background:#fff}
   .inp:focus{outline:2px solid var(--accent); border-color:transparent}
-  textarea.inp{resize:vertical; min-height:64px}
-  .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
-  @media(max-width:560px){ .row2{grid-template-columns:1fr} }
+  textarea.inp{resize:vertical; min-height:52px}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:9px}  /* stays two-up on phones — date+time belong side by side */
   details.help{margin-top:8px; border:1px solid var(--line); border-radius:10px; background:var(--bg)}
   details.help summary{cursor:pointer; padding:9px 12px; font-weight:600; font-size:13px; color:var(--accent-deep)}
   details.help .inner{padding:0 14px 12px; font-size:13px; color:#43463c}
@@ -265,11 +265,10 @@
   @keyframes pop{from{opacity:0; transform:translateY(12px) scale(.98)} to{opacity:1; transform:none}}
   .modal .mh{display:flex; align-items:center; gap:10px; padding:16px 20px; border-bottom:1px solid var(--line)}
   .modal .mh h3{margin:0; font-size:17px}
-  .modal .mb{padding:6px 20px 20px; max-height:72vh; overflow:auto}
+  .modal .mb{padding:4px 16px 14px; max-height:76vh; overflow:auto}
   .modal .mf{display:flex; gap:10px; padding:14px 20px; border-top:1px solid var(--line); background:var(--bg)}
-  .typegrid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px}
-  @media(max-width:560px){ .typegrid{grid-template-columns:repeat(3,1fr)} }
-  .typebtn{display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 4px; border:1px solid var(--line); border-radius:11px; background:var(--card); font-size:12px; font-weight:500; color:var(--muted)}
+  .typegrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(56px,1fr)); gap:6px}
+  .typebtn{display:flex; flex-direction:column; align-items:center; gap:2px; padding:7px 2px; border:1px solid var(--line); border-radius:10px; background:var(--card); font-size:10px; font-weight:600; color:var(--muted)}
   .typebtn .e{font-size:20px}
   .typebtn.on{border-color:var(--ink); background:var(--ink); color:#fff}
   .geo-results{border:1px solid var(--line); border-radius:10px; margin-top:6px; overflow:hidden; display:none}
@@ -280,8 +279,8 @@
   .loc-pick{font-size:12.5px; color:var(--green); margin-top:6px; display:none}
   .loc-pick.show{display:flex; align-items:center; gap:6px}
   .checklist label{display:flex; align-items:center; gap:9px; font-weight:400; font-size:13.5px; padding:3px}
-  .subsec{border:1px solid var(--line); border-radius:12px; padding:12px; margin-top:6px; background:var(--bg)}
-  .subsec h4{margin:0 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted)}
+  .subsec{border:1px solid var(--line); border-radius:12px; padding:9px 10px; margin-top:4px; background:var(--bg)}
+  .subsec h4{margin:0 0 6px; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted)}
 
   #toast{position:fixed; bottom:calc(var(--bar-h) + var(--bar-pad) + 18px - var(--vv-gap,0px)); left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#fff; padding:11px 18px; border-radius:12px; font-size:14px; font-weight:500; z-index:90; opacity:0; transition:all .25s; pointer-events:none; box-shadow:0 12px 40px rgba(0,0,0,.3)}
   #toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
@@ -419,7 +418,7 @@
   .datebar.offday .datemain .dtz{display:none}
   .wx{flex:none; font-size:10.5px; font-weight:600; color:#3a5bd9; background:#edf2ff; padding:2px 8px; border-radius:20px; white-space:nowrap}
   .copyday-wrap{display:flex; justify-content:center; margin-top:14px}
-  .paste-conf{width:100%; display:flex; align-items:center; gap:7px; padding:11px 13px; border:1.5px dashed rgba(95,139,6,.45); border-radius:12px; color:var(--accent-deep); font-weight:600; font-size:13px; margin-bottom:12px; background:var(--accent-soft); text-align:left}
+  .paste-conf{width:100%; display:flex; align-items:center; gap:7px; padding:8px 12px; border:1.5px dashed rgba(95,139,6,.45); border-radius:12px; color:var(--accent-deep); font-weight:600; font-size:13px; margin-bottom:12px; background:var(--accent-soft); text-align:left}
   .more-toggle{width:100%; display:flex; align-items:center; gap:7px; padding:11px 13px; border:1.5px dashed var(--line-strong); border-radius:12px; color:var(--muted); font-weight:600; font-size:13.5px; margin:2px 0 10px; background:var(--bg)}
   .more-toggle .mchev{margin-left:auto; transition:transform .2s var(--ease)}
   #moreFold{animation:viewfade .22s var(--ease)}
@@ -520,8 +519,7 @@
   .ess-b{white-space:pre-wrap; font-size:13.5px; line-height:1.65; color:var(--ink)}
   .ess-add{display:flex; width:100%; text-align:left; border:1.5px dashed var(--line-strong); border-radius:14px; padding:13px 15px; color:var(--muted); font-size:13.5px; margin:4px 0 14px; background:var(--card)}
   .ess-add:hover{border-color:#e0483d; color:var(--ink)}
-  .orline{display:flex; align-items:center; gap:10px; color:var(--faint); font-size:11.5px; text-transform:uppercase; letter-spacing:.07em; margin:2px 0 10px}
-  .orline::before,.orline::after{content:""; flex:1; height:1px; background:var(--line)}
+  .orline{display:flex; align-items:center; gap:10px; color:var(--faint); font-size:11.5px; text-transform:uppercase; letter-spacing:.07em; margin:10px 0; flex:1; height:1px; background:var(--line)}
   .dchip a{color:inherit}
   .datebar.offday .datemain .wx{display:none !important}
   .gotoday:active{transform:scale(.93)}
@@ -676,7 +674,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "12 Jun 2026 · r63";
+const APP_BUILD = "12 Jun 2026 · r64";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1577,7 +1575,7 @@ function hotspotModal(item){
   <div class="mb">
     <div class="field"><label>Type</label><div class="typegrid" id="htypeGrid">${typeBtns}</div></div>
     <div class="field"><label>Name</label><input class="inp" id="h-name" value="${esc(draft.name)}" placeholder="e.g. Locavore"></div>
-    ${locFieldHTML("hsloc","Location — paste a Google Maps link or search",draft.location)}
+    ${locFieldHTML("hsloc","Location",draft.location)}
     <div class="field"><label>Notes (optional)</label><textarea class="inp" id="h-notes" placeholder="Why you want to go, hours, who recommended it…">${esc(draft.notes||"")}</textarea></div>
     <div class="field"><label>Website / link (optional)</label><input class="inp" id="h-url" value="${esc(draft.url||"")}" placeholder="https://…"></div>
     <div class="field"><label>Photos</label>
@@ -2060,7 +2058,7 @@ function itemModal(item){
   openModal(`<div class="mh"><h3>${isEdit?"Edit item":"Add to itinerary"}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
     <div class="mb">
       <div class="field"><label>Type</label><div class="typegrid" id="typeGrid">${typeBtns}</div></div>
-      ${(FLAVORS[draft.type]||[]).length>1?`<div class="field"><label>Icon <span class="hint" style="display:inline">— auto from the title, tap to override</span></label><div class="flavrow" id="flavRow"><button type="button" class="fchip${!draft.emoji?" on":""}" data-act="flavor" data-e="">✨ auto</button>${FLAVORS[draft.type].map(e=>`<button type="button" class="fchip${draft.emoji===e?" on":""}" data-act="flavor" data-e="${e}">${e}</button>`).join("")}</div></div>`:""}
+      ${(FLAVORS[draft.type]||[]).length>1?`<div class="field"><label>Icon <span class="hint" style="display:inline">— auto, tap to override</span></label><div class="flavrow" id="flavRow"><button type="button" class="fchip${!draft.emoji?" on":""}" data-act="flavor" data-e="">✨ auto</button>${FLAVORS[draft.type].map(e=>`<button type="button" class="fchip${draft.emoji===e?" on":""}" data-act="flavor" data-e="${e}">${e}</button>`).join("")}</div></div>`:""}
       <button type="button" class="paste-conf" data-act="importFill">✨ Import — fill from a ticket or booking</button>
       <div class="field"><label>Title</label><input class="inp" id="f-title" value="${esc(draft.title)}" placeholder="${isLeg?"e.g. Flight QR1 LHR → DPS":"e.g. Snorkelling · Blue Lagoon"}"></div>
       <div class="row2"><div class="field"><label>${isLeg?"Departure date":"Date"}</label><input class="inp" type="date" id="f-date" value="${esc(draft.date||"")}"></div>
@@ -2111,12 +2109,11 @@ async function handleItemFiles(files){
   renderItemFileChips();
   if(st) st.textContent="Done — "+draft.files.length+" file"+(draft.files.length===1?"":"s")+" attached.";
 }
-function locFieldHTML(prefix,label,loc){ loc=loc||{};
-  return `<div class="subsec"><h4>${label}</h4><div style="display:flex;gap:8px"><input class="inp" id="${prefix}-q" placeholder="Search place or address…" value="${esc(loc.name||"")}"><button class="btn ghost sm" type="button" data-geo="${prefix}">Search</button></div>
+function locFieldHTML(prefix,label,loc){ loc=loc||{}; const picked=loc.lat!=null||!!loc.address;
+  return `<div class="subsec"><h4>${label}</h4><div style="display:flex;gap:8px"><input class="inp" id="${prefix}-q" placeholder="Search, or paste a Google Maps link…" value="${esc(loc.name||"")}"><button class="btn ghost sm" type="button" data-geo="${prefix}">Search</button></div>
     <div class="geo-results" id="${prefix}-res"></div>
     <div class="loc-pick ${loc.lat!=null?"show":""}" id="${prefix}-pick">📍 <span id="${prefix}-picktxt">${esc(loc.address||loc.name||"")}</span> ${loc.lat!=null?`<span class="mono" style="color:var(--faint)">(${(+loc.lat).toFixed(3)}, ${(+loc.lng).toFixed(3)})</span>`:""}</div>
-    <input class="inp" id="${prefix}-addr" placeholder="Address (editable)" value="${esc(loc.address||"")}" style="margin-top:8px">
-    <div class="hint" style="margin-top:6px">Tip: paste a Google Maps link in the search box to grab its pin.</div></div>`;
+    <input class="inp" id="${prefix}-addr" placeholder="Address (editable)" value="${esc(loc.address||"")}" style="margin-top:7px${picked?"":";display:none"}"></div>`;
 }
 function renderLocBlock(){ const isLeg=TYPES[draft.type]?.legtoo;
   $("#locBlock").innerHTML=isLeg?(locFieldHTML("from","From",draft.fromLoc)+locFieldHTML("to","To",draft.toLoc)):locFieldHTML("main","Location",draft.location); }
@@ -2181,7 +2178,7 @@ async function doGeocode(prefix, skipPlaces){ const q=$("#"+prefix+"-q").value.t
   }catch(e){ res.innerHTML='<button disabled>Search failed — check connection or enter manually</button>'; }
 }
 function parseLatLng(s){ let m=s.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)||s.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/)||s.match(/^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/)||s.match(/q=(-?\d+\.\d+),(-?\d+\.\d+)/); return m?{lat:+m[1],lng:+m[2]}:null; }
-function setLoc(prefix,loc){ $("#"+prefix+"-q").value=loc.name||""; $("#"+prefix+"-addr").value=loc.address||""; const pick=$("#"+prefix+"-pick"); pick.classList.add("show"); $("#"+prefix+"-picktxt").textContent=loc.address||loc.name||""; draft._tmp=draft._tmp||{}; draft._tmp[prefix]=loc; }
+function setLoc(prefix,loc){ $("#"+prefix+"-q").value=loc.name||""; const aEl=$("#"+prefix+"-addr"); aEl.value=loc.address||""; aEl.style.display="block"; const pick=$("#"+prefix+"-pick"); pick.classList.add("show"); $("#"+prefix+"-picktxt").textContent=loc.address||loc.name||""; draft._tmp=draft._tmp||{}; draft._tmp[prefix]=loc; }
 function collectItemForm(){ if(!$("#f-title")) return;
   draft.title=$("#f-title").value.trim(); draft.date=$("#f-date").value; draft.time=$("#f-time").value; draft.date2=$("#f-date2").value; draft.time2=$("#f-time2").value;
   draft.tz=$("#f-tz").value; draft.tz2=$("#f-tz2").value; draft.conf=$("#f-conf").value.trim(); draft.notes=$("#f-notes").value;
