@@ -459,9 +459,6 @@
   .imp-row .it2{flex:1; min-width:0; font-size:13.5px; line-height:1.45}
   .flavrow{display:flex; gap:7px; flex-wrap:wrap}
   .flavrow .fchip{font-size:15px; padding:7px 11px}
-  .durrow{display:flex; gap:7px; flex-wrap:wrap}
-  .durchip{padding:9px 14px; border:1px solid var(--line); border-radius:11px; background:var(--card); font-size:13.5px; font-weight:600; color:var(--muted)}
-  .durchip.on{background:var(--ink); color:#fff; border-color:var(--ink)}
   .cont-card{flex:1; min-width:0; display:flex; align-items:center; gap:8px; border:1.5px dashed var(--line-strong); border-radius:13px; padding:12px 13px; background:var(--card); text-align:left; margin:4px 0}
   .cont-card .ce{flex:none; font-size:16px}
   .cont-card .ct{flex:1; min-width:0; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted)}
@@ -674,7 +671,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "12 Jun 2026 · r64";
+const APP_BUILD = "12 Jun 2026 · r65";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -2052,8 +2049,6 @@ function itemModal(item){
   const isEdit = !!(item && state.items.some(x=>x.id===item.id));
   const isLeg=TYPES[draft.type]?.legtoo;
   const moreOpen=!!(draft.tz2||draft.conf||draft.notes||(draft.files||[]).length);
-  let durSel=""; if(!isLeg&&draft.time&&draft.time2){ const [h1,m1]=draft.time.split(":").map(Number), [h2,m2]=draft.time2.split(":").map(Number);
-    let mins=(h2*60+m2)-(h1*60+m1); if(draft.date2&&draft.date2!==draft.date) mins+=1440; if([30,60,90,120,180].includes(mins)) durSel=String(mins); else durSel="x"; }
   const typeBtns=Object.entries(TYPES).map(([k,t])=>`<button type="button" class="typebtn${draft.type===k?" on":""}" data-type="${k}"><span class="e">${t.emoji}</span>${t.label}</button>`).join("");
   openModal(`<div class="mh"><h3>${isEdit?"Edit item":"Add to itinerary"}</h3><button class="iconbtn" style="margin-left:auto" data-act="closeModal">✕</button></div>
     <div class="mb">
@@ -2065,8 +2060,7 @@ function itemModal(item){
         <div class="field"><label>${isLeg?"Departure time":"Time"}</label><input class="inp" type="time" id="f-time" value="${esc(draft.time||"")}"></div></div>
       ${isLeg?`<div class="row2"><div class="field"><label>Arrival date</label><input class="inp" type="date" id="f-date2" value="${esc(draft.date2||"")}"></div>
         <div class="field"><label>Arrival time</label><input class="inp" type="time" id="f-time2" value="${esc(draft.time2||"")}"></div></div>`
-      :`<div class="field"><label>Duration (optional)</label><div class="durrow" id="durRow">${[["","—"],["30","30m"],["60","1h"],["90","1½h"],["120","2h"],["180","3h"]].map(d=>`<button type="button" class="durchip${durSel===d[0]?" on":""}" data-act="durChip" data-min="${d[0]}">${d[1]}</button>`).join("")}</div></div>
-      <div class="row2"><div class="field"><label>End date (optional)</label><input class="inp" type="date" id="f-date2" value="${esc(draft.date2||"")}"></div>
+      :`<div class="row2"><div class="field"><label>End date (optional)</label><input class="inp" type="date" id="f-date2" value="${esc(draft.date2||"")}"></div>
         <div class="field"><label>End time (optional)</label><input class="inp" type="time" id="f-time2" value="${esc(draft.time2||"")}"></div></div>`}
       ${draft.type==="travel"?`<div class="field"><label>Flight number (optional — flights only)</label><div style="display:flex;gap:8px"><input class="inp mono" id="f-flightno" value="${esc(draft.flightNo||"")}" placeholder="e.g. QR35" style="flex:1;min-width:0"><button type="button" class="btn ghost sm" data-act="flightLookup" style="flex:none">🔍 Look up</button></div><div class="hint" id="flHint">With a date set, 🔍 fills airports & times automatically.</div></div>`:""}
       <div id="locBlock"></div>
@@ -2284,15 +2278,6 @@ document.addEventListener("click",e=>{
     case "docFilter": ui.docFilter=a.dataset.k||""; renderMain(); break;
     case "copyEss": copy((state.meta.essentials||"").trim()); break;
     case "saveEss": { const v=$("#essText").value.trim(); state.meta.essentials=(v===ESS_TEMPLATE.trim()?"":v); save(); syncSet("meta",state.meta); closeModal(); renderMain(); toast("Essentials saved",true); break; }
-    case "durChip": { const mins=a.dataset.min; const tEl=$("#f-time"), t2El=$("#f-time2"), dEl=$("#f-date"), d2El=$("#f-date2");
-      document.querySelectorAll("#durRow .durchip").forEach(b=>b.classList.toggle("on",b===a));
-      if(mins===""){ if(t2El) t2El.value=""; if(d2El) d2El.value=""; break; }
-      const tv=tEl&&tEl.value; if(!tv){ toast("Set a start time first"); a.classList.remove("on"); break; }
-      const [h,m]=tv.split(":").map(Number); const total=h*60+m+(+mins);
-      const eh=Math.floor(total/60)%24, em=total%60;
-      if(t2El) t2El.value=String(eh).padStart(2,"0")+":"+String(em).padStart(2,"0");
-      if(d2El){ if(total>=1440 && dEl&&dEl.value){ const dd=new Date(dEl.value+"T00:00:00Z"); dd.setUTCDate(dd.getUTCDate()+1); d2El.value=dd.toISOString().slice(0,10); } else d2El.value=""; }
-      break; }
     case "flavor": { if(!draft) break; draft.emoji=a.dataset.e||""; if(!draft.emoji) delete draft.emoji;
       document.querySelectorAll("#flavRow .fchip").forEach(b=>b.classList.toggle("on", (b.dataset.e||"")===(draft.emoji||""))); break; }
     case "toggleMore": { const f=$("#moreFold"); if(f){ const open=f.style.display!=="none"; f.style.display=open?"none":"block"; const ch=a.querySelector(".mchev"); if(ch) ch.style.transform=open?"":"rotate(180deg)"; } break; }
