@@ -676,7 +676,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "12 Jun 2026 · r62";
+const APP_BUILD = "12 Jun 2026 · r63";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -914,7 +914,7 @@ function focusItem(id){
     if(!map) return;
     const pts=locsOf(it); if(!pts.length) return;
     const navLoc=startLoc(it)||endLoc(it); showFromMe(navLoc,(navLoc&&navLoc.name)||it.title);
-    if(isMobile() && sheetViews() && sheet.state==="full") return; // map hidden — don't move it, and never yank the sheet (Henri)
+    if(isMobile() && sheetViews() && sheet.state==="full"){ window._pendingFocus=id; return; } // map hidden: remember the target — fly when the sheet next reveals the map (never yank it)
     // No auto-popup on item tap — the expanded card below shows everything; popups open only when a pin itself is tapped
     const far = pts.length>1 && pts[0].distanceTo(pts[pts.length-1])>400000; // >400km = a flight: don't zoom out to the world
     if(pts.length>1 && !far){
@@ -956,6 +956,7 @@ function expandItem(id){
   focusItem(id);
 }
 function collapseItem(){
+  window._pendingFocus=null;
   if(!ui.expandedId) return;
   setCardExpanded(ui.expandedId,false);
   ui.expandedId=null;
@@ -1025,6 +1026,7 @@ function applySheetTop(px,animate){ const a=sheetAppEl(); if(!a) return; a.class
 function flyVisible(ll,z){ if(!map) return; z=Math.max(map.getZoom(), z||14); const pt=map.project(L.latLng(ll), z); pt.y += sheetCover()/2; map.flyTo(map.unproject(pt,z), z, {duration:.5}); }
 function sheetCover(){ if(!isMobile()||!sheetViews()) return 0; const a=sheetAppEl(); const H=a?a.clientHeight:0; return Math.max(0, H - sheetCurTop()); }
 function setSheet(name,animate=true){
+  if(name!=="full" && window._pendingFocus){ const pid=window._pendingFocus; window._pendingFocus=null; setTimeout(()=>{ try{ focusItem(pid); }catch(e){} }, 360); }
   if(!isMobile()||!sheetViews()) return;
   sheet.state=name; try{ localStorage.setItem(SHEET_KEY,name); }catch(e){}
   applySheetTop(sheetSnapPx(name),animate);
