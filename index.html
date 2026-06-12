@@ -435,6 +435,25 @@
   .filtrow::-webkit-scrollbar{display:none}
   .fchip{flex:none; padding:7px 13px; border:1px solid var(--line); border-radius:20px; background:var(--card); font-size:13px; font-weight:600; color:var(--muted)}
   .fchip.on{background:var(--ink); color:#fff; border-color:var(--ink)}
+  .fsbox{margin-top:10px; padding:9px 12px; border:1px solid var(--line); border-radius:11px; background:var(--bg); font-size:13px}
+  .fst.ok{color:#11936a} .fst.bad{color:#c0392b}
+  #printRoot{display:none}
+  @media print{
+    body>*:not(#printRoot){display:none !important}
+    #printRoot{display:block; font-family:Georgia,serif; color:#000}
+    #printRoot h1{font-size:22pt; margin:0 0 2pt}
+    #printRoot .pr-sub{font-size:11pt; color:#444; margin-bottom:14pt}
+    #printRoot .pr-day{margin-bottom:12pt; page-break-inside:avoid}
+    #printRoot h2{font-size:13pt; border-bottom:1.5pt solid #000; padding-bottom:3pt; margin:10pt 0 6pt}
+    #printRoot h2 span{font-weight:normal; font-size:9pt; color:#555; float:right}
+    #printRoot .pr-item{display:flex; gap:10pt; margin:5pt 0; page-break-inside:avoid}
+    #printRoot .pr-time{flex:0 0 70pt; font-size:10pt; color:#333}
+    #printRoot .pr-bd{flex:1; font-size:10.5pt; line-height:1.45}
+    #printRoot .pr-mono{font-family:Menlo,monospace; font-size:9pt; background:#eee; padding:0 3pt}
+    #printRoot .pr-loc{color:#333; font-size:9.5pt}
+    #printRoot .pr-notes{color:#555; font-size:9pt; white-space:pre-wrap}
+    #printRoot .pr-free{color:#666; font-style:italic; font-size:10pt}
+  }
   .imp-row{display:flex; align-items:flex-start; gap:10px; padding:11px 12px; border:1px solid var(--line); border-radius:12px; margin-top:8px; background:var(--card)}
   .imp-row input{width:18px;height:18px;accent-color:#5f8b06;margin-top:2px}
   .imp-row .ie{font-size:18px; flex:none}
@@ -657,7 +676,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "12 Jun 2026 · r61";
+const APP_BUILD = "12 Jun 2026 · r62";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -1286,7 +1305,8 @@ function tlRow(it,isLast){
       ${(it.files&&it.files.length)?`<div class="chiprow" style="margin-top:8px">${it.files.map(f=>`<a class="chip doc" href="${esc(f.url)}" target="_blank" rel="noopener">📎 ${esc(f.name)}</a>`).join("")}</div>`:""}
       ${linkedH?`<div class="chiprow" style="margin-top:9px"><button class="chip doc" data-act="goHotspot" data-id="${linkedH.id}">📍 ${esc(linkedH.name)} · view hotspot</button></div>`:""}
       ${nb.length?`<div class="nearby"><div class="nb-h">📍 Nearby hotspots</div>${nb.map(x=>`<button class="nb-row" data-act="goHotspot" data-id="${x.h.id}"><span>${(HOTSPOT_TYPES[x.h.type]||HOTSPOT_TYPES.other).emoji} ${esc(x.h.name)}</span><span class="nb-d">${distLabel(x.d)}</span></button>`).join("")}</div>`:""}
-      <div style="margin-top:12px; display:flex; gap:7px; flex-wrap:wrap">${isFlight(it)?`<a class="btn ghost sm" href="${flightStatusUrl(it)}" target="_blank" rel="noopener">✈️ Flight status</a>`:""}<button class="btn lime sm" data-act="edit" data-id="${it.id}">✎ Edit</button></div>
+      ${isFlight(it)&&it.flightNo?`<div class="fsline" id="fs-${it.id}"></div>`:""}
+      <div style="margin-top:12px; display:flex; gap:7px; flex-wrap:wrap">${isFlight(it)&&it.flightNo&&getAiKey()?`<button class="btn ghost sm" data-act="flightStatus" data-id="${it.id}">🛰 Live status</button>`:""}${isFlight(it)?`<a class="btn ghost sm" href="${flightStatusUrl(it)}" target="_blank" rel="noopener">✈️ Google</a>`:""}<button class="btn lime sm" data-act="edit" data-id="${it.id}">✎ Edit</button></div>
     </div>`;
   return {__item:true, html:`<div class="tl-row ${isLast?"last":""} ${it.id===ui.expandedId?'rowexp':''}">
     <div class="tl-time mono">${timeHtml}${ei&&isLeg?`<br>${fmtTime(ei,eTz)}${(()=>{ const dd=it.date&&it.date2?Math.round((new Date(it.date2)-new Date(it.date))/86400000):0; return dd!==0?`<sup class="plusd">${dd>0?"+":"\u2212"}${Math.abs(dd)}</sup>`:""; })()}<span class="z">${esc(tzAbbr(eTz))}</span>`:""}</div>
@@ -1667,6 +1687,20 @@ async function aiExtractItems(parts,hintDate){
   let arr; try{ arr=JSON.parse(txt); }catch(e){ const mJ=txt.match(/\[[\s\S]*\]/); arr=mJ?JSON.parse(mJ[0]):[]; }
   return Array.isArray(arr)?arr:[arr];
 }
+async function aiToolJSON(promptText, tool){
+  const key=getAiKey(); if(!key) throw new Error("no-key");
+  const body={contents:[{parts:[{text:promptText}]}],tools:[tool],generationConfig:{temperature:0}};
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${AI_MODEL}:generateContent?key=${encodeURIComponent(key)}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const j=await r.json();
+  if(!r.ok) throw Object.assign(new Error((j&&j.error&&j.error.message)||("HTTP "+r.status)),{code:r.status});
+  const txt=(j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts||[]).map(pp=>pp.text||"").join("");
+  const mJ=txt.match(/\{[\s\S]*\}/); if(!mJ) throw new Error("no structured answer"); return JSON.parse(mJ[0]);
+}
+async function resolveMapsLink(url){
+  const out=await aiToolJSON(`Open this Google Maps link and identify the exact place it points to: ${url}\nReturn ONLY JSON: {"name":string,"address":string,"lat":number,"lng":number}. lat/lng must be the place's coordinates as numbers.`,{url_context:{}});
+  if(out&&typeof out.lat==="number"&&typeof out.lng==="number") return {name:out.name||"Pinned location",address:out.address||"",lat:out.lat,lng:out.lng};
+  throw new Error("couldn't locate");
+}
 function fileToB64(f){ return new Promise((res,rej)=>{ const rd=new FileReader(); rd.onload=()=>res(String(rd.result).split(",")[1]); rd.onerror=rej; rd.readAsDataURL(f); }); }
 let _pdfjs=null;
 async function pdfText(f){
@@ -1905,6 +1939,24 @@ function essModal(){
 /* ====================== CALENDAR EXPORT (.ics) ====================== */
 function icsEsc(s){ return String(s||"").replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n"); }
 function icsDate(d){ return d.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,"Z"); }
+function printTrip(){
+  let root=$("#printRoot"); if(!root){ root=document.createElement("div"); root.id="printRoot"; document.body.appendChild(root); }
+  const days=tripDays(); const rng=days.length?`${fmtDateShort(days[0].instant,days[0].tz)} – ${fmtDateShort(days[days.length-1].instant,days[days.length-1].tz)}`:"";
+  let h=`<h1>🌴 INDO 2026</h1><div class="pr-sub">${esc(rng)} · ${days.length} days · Henri & Elisa</div>`;
+  days.forEach((d,i)=>{ h+=`<div class="pr-day"><h2>${esc(fmtDateFull(d.instant,d.tz))} <span>Day ${i+1}/${days.length} · ${esc(dayZonesLabel(d))}</span></h2>`;
+    if(!d.items.length) h+=`<div class="pr-free">Free day</div>`;
+    d.items.forEach(it=>{ const si=startInstant(it),ei=endInstant(it);
+      const time=(si&&it.time)?fmtTime(si,startTz(it))+(ei&&it.time2?" – "+fmtTime(ei,endTz(it)):""):"";
+      const locs=[it.location,it.fromLoc,it.toLoc].filter(l=>l&&(l.name||l.address));
+      h+=`<div class="pr-item"><div class="pr-time">${esc(time)}</div><div class="pr-bd"><b>${flavorEmoji(it)} ${esc(it.title||"")}</b>${it.flightNo?` <span class="pr-mono">${esc(it.flightNo)}</span>`:""}${it.conf?` <span class="pr-mono">ref ${esc(it.conf)}</span>`:""}
+        ${locs.length?`<div class="pr-loc">${locs.map(l=>esc(l.name||l.address)).join(" → ")}</div>`:""}
+        ${it.notes?`<div class="pr-notes">${esc(it.notes)}</div>`:""}</div></div>`; });
+    h+=`</div>`; });
+  const ess=(state.meta.essentials||"").trim();
+  if(ess) h+=`<div class="pr-day"><h2>🆘 Essentials</h2><div class="pr-notes" style="white-space:pre-wrap">${esc(ess)}</div></div>`;
+  root.innerHTML=h;
+  setTimeout(()=>{ try{ window.print(); }catch(e){ toast("Couldn't open the print dialog — try from Safari"); } },60);
+}
 function buildICS(){
   const out=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//INDO 2026//Trip//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:INDO 2026"];
   let n=0;
@@ -1954,6 +2006,9 @@ function renderSettings(){ const m=state.meta; const ownKey=!!(m.mapsKey||"").tr
     <div class="field"><label>Gemini AI key <span class="keystatus ${(m.aiKey||"").trim()?"on":"off"}">${(m.aiKey||"").trim()?"● import magic on":"○ not set"}</span></label>
       <input class="inp mono" type="password" data-set="aiKey" placeholder="AQ.… or AIza… from aistudio.google.com/apikey" value="${esc(m.aiKey||"")}">
       <div class="hint">Powers <b>✨ Import</b> — turn flight PDFs, booking screenshots and ticket photos into itinerary items automatically. Stored in your shared trip (not public). Manage credits at <a href="https://ai.studio/projects" target="_blank" rel="noopener">ai.studio</a>.</div></div>
+    <div class="field"><label>Print / PDF</label>
+      <button class="btn ghost" data-act="printTrip" style="width:100%">🖨 Export itinerary as PDF / print</button>
+      <div class="hint">Opens the print dialog — choose "Save as PDF". ${document.documentElement.classList.contains("standalone")?"<b>Tip: open the app in Safari for this</b> — the installed app can't show the print dialog.":""}</div></div>
     <div class="field"><label>Calendar</label><button class="btn ghost" data-act="icsExport" style="justify-content:center">📆 Download trip calendar (.ics)</button><div class="hint">Every flight, transfer and activity lands in your real calendar (with reminders — 3h before flights). Open the downloaded file and iOS/Google Calendar does the rest. Re-download after big changes.</div></div>
     <div class="field"><label>Google Maps API key <span class="keystatus ${keyOn?"on":"off"}">${keyOn?"● live data on":"○ using estimates"}</span></label>
       <input class="inp mono" type="password" data-set="mapsKey" placeholder="${ownKey?'AIza…':'Built-in key active — leave blank'}" value="${esc(m.mapsKey)}">
@@ -2013,7 +2068,7 @@ function itemModal(item){
       :`<div class="field"><label>Duration (optional)</label><div class="durrow" id="durRow">${[["","—"],["30","30m"],["60","1h"],["90","1½h"],["120","2h"],["180","3h"]].map(d=>`<button type="button" class="durchip${durSel===d[0]?" on":""}" data-act="durChip" data-min="${d[0]}">${d[1]}</button>`).join("")}</div></div>
       <div class="row2"><div class="field"><label>End date (optional)</label><input class="inp" type="date" id="f-date2" value="${esc(draft.date2||"")}"></div>
         <div class="field"><label>End time (optional)</label><input class="inp" type="time" id="f-time2" value="${esc(draft.time2||"")}"></div></div>`}
-      ${draft.type==="travel"?`<div class="field"><label>Flight number (optional — flights only, enables live status)</label><input class="inp mono" id="f-flightno" value="${esc(draft.flightNo||"")}" placeholder="e.g. QR35"></div>`:""}
+      ${draft.type==="travel"?`<div class="field"><label>Flight number (optional — flights only)</label><div style="display:flex;gap:8px"><input class="inp mono" id="f-flightno" value="${esc(draft.flightNo||"")}" placeholder="e.g. QR35" style="flex:1;min-width:0"><button type="button" class="btn ghost sm" data-act="flightLookup" style="flex:none">🔍 Look up</button></div><div class="hint" id="flHint">With a date set, 🔍 fills airports & times automatically.</div></div>`:""}
       <div id="locBlock"></div>
       <button type="button" class="more-toggle" data-act="toggleMore">⚙︎ More options <span class="mchev">▾</span></button>
       <div id="moreFold" style="display:${moreOpen?"block":"none"}">
@@ -2031,6 +2086,8 @@ function itemModal(item){
     <div class="mf">${isEdit?`<button class="btn danger" data-act="delItem" data-id="${draft.id}">Delete</button>`:""}
       <div style="margin-left:auto;display:flex;gap:10px"><button class="btn ghost" data-act="closeModal">Cancel</button><button class="btn lime" data-act="saveItem">${isEdit?"Save":"Add to trip"}</button></div></div>`);
   renderLocBlock();
+  $("#locBlock").addEventListener("paste",e=>{ const inp=e.target.closest&&e.target.closest("input[id$='-q']"); if(!inp) return;
+    setTimeout(()=>{ if(/maps\.|goo\.gl|g\.co/.test(inp.value)) doGeocode(inp.id.replace(/-q$/,"")); },60); });
   $("#typeGrid").addEventListener("click",e=>{ const b=e.target.closest(".typebtn"); if(!b)return; draft._typeTouched=true; draft.type=b.dataset.type; collectItemForm(); itemModal(draft); });
   $("#iFile")?.addEventListener("change",e=>handleItemFiles(e.target.files));
   /* live type inference from the title (until the user picks a type manually) */
@@ -2101,6 +2158,14 @@ function enrichHotspotFromPlace(placeId){
 }
 function doGeocodeOSM(prefix){ doGeocode(prefix, true); }
 async function doGeocode(prefix, skipPlaces){ const q=$("#"+prefix+"-q").value.trim(); if(!q) return;
+  // phone share links (maps.app.goo.gl) carry no coords — open them via Gemini url_context
+  const short=q.match(/https?:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|g\.co\/kgs)\/\S+/i);
+  if(short){ const res=$("#"+prefix+"-res"); res.innerHTML='<button disabled>✨ Reading the link…</button>'; res.classList.add("show");
+    try{ const loc=await resolveMapsLink(short[0]); setLoc(prefix,loc); res.classList.remove("show"); toast("📍 "+(loc.name||"Located"),true); }
+    catch(e){ res.innerHTML='<button disabled>'+(getAiKey()?esc("Couldn't read that link — open it and search the place name instead"):"Reading short links needs the Gemini key (Settings)")+'</button>'; }
+    return; }
+  const placeName=(!parseLatLng(q))&&q.match(/\/place\/([^\/@?]+)/);
+  if(placeName){ $("#"+prefix+"-q").value=decodeURIComponent(placeName[1].replace(/\+/g," ")); return doGeocode(prefix, skipPlaces); }
   if(!skipPlaces && googleReady && placesSvc() && !parseLatLng(q)){ placesSearch(prefix); return; }
   const coords=parseLatLng(q);
   if(coords){ setLoc(prefix,{name:"Locating…",address:"",lat:coords.lat,lng:coords.lng});
@@ -2216,6 +2281,7 @@ document.addEventListener("click",e=>{
     case "copyDay": { const d=tripDays().find(x=>x.key===a.dataset.date); if(d) copy(dayText(d)); break; }
     case "gonext": { expandItem(id); setTimeout(()=>{ document.querySelector('.tl-card[data-card="'+cssEsc(id)+'"]')?.scrollIntoView({block:"center",behavior:"smooth"}); },120); break; }
     case "editEss": essModal(); break;
+    case "printTrip": printTrip(); break;
     case "docFilter": ui.docFilter=a.dataset.k||""; renderMain(); break;
     case "copyEss": copy((state.meta.essentials||"").trim()); break;
     case "saveEss": { const v=$("#essText").value.trim(); state.meta.essentials=(v===ESS_TEMPLATE.trim()?"":v); save(); syncSet("meta",state.meta); closeModal(); renderMain(); toast("Essentials saved",true); break; }
@@ -2245,6 +2311,39 @@ document.addEventListener("click",e=>{
     case "rmFile": { const i=+a.dataset.i; if(draft&&draft.files){ draft.files.splice(i,1); renderItemFileChips(); } break; }
     case "importDoc": closeModal(); importModal(a.dataset.date||""); break;
     case "importFill": collectItemForm(); importModal(draft.date||"", true); break;
+    case "flightStatus": { const it=state.items.find(x=>x.id===id); if(!it) break;
+      const box=$("#fs-"+id); if(!box) break;
+      const cached=window._fsCache&&window._fsCache[id];
+      if(cached && Date.now()-cached.t<5*60000){ box.innerHTML=cached.html; break; }
+      box.innerHTML='<span class="hint">🛰 Checking live status…</span>';
+      aiToolJSON(`Current live status of flight ${it.flightNo} on ${it.date}. Return ONLY JSON: {"status":string,"depGate":string|null,"depTerminal":string|null,"delayMinutes":number|null,"note":string|null}. status one of: scheduled, boarding, departed, in air, landed, delayed, cancelled, unknown.`,{google_search:{}})
+        .then(fs=>{ const bits=[]; const stat=(fs.status||"unknown");
+          bits.push(`<b class="fst ${/delay|cancel/i.test(stat)?"bad":"ok"}">${esc(stat.toUpperCase())}</b>`);
+          if(fs.delayMinutes) bits.push(esc("+"+fs.delayMinutes+" min"));
+          if(fs.depTerminal) bits.push("Terminal "+esc(fs.depTerminal));
+          if(fs.depGate) bits.push("Gate "+esc(fs.depGate));
+          if(fs.note) bits.push(esc(String(fs.note).slice(0,80)));
+          const html=`<div class="fsbox">${bits.join(" · ")} <span class="hint" style="display:inline">as of ${fmtTime(new Date(),state.meta.destTz)}</span></div>`;
+          window._fsCache=window._fsCache||{}; window._fsCache[id]={t:Date.now(),html}; box.innerHTML=html; })
+        .catch(e=>{ box.innerHTML='<span class="hint">'+esc(importErrMsg(e))+'</span>'; });
+      break; }
+    case "flightLookup": { collectItemForm(); const fn=(draft.flightNo||"").replace(/\s+/g,""), dd=draft.date;
+      if(!fn||!dd){ toast("Enter the flight number and departure date first"); break; }
+      const hint=$("#flHint"); if(hint) hint.textContent="✨ Searching for "+fn+" on "+dd+"…";
+      aiToolJSON(`Search for scheduled flight ${fn} departing on ${dd}. Return ONLY JSON: {"airline":string,"fromCode":string,"fromAirport":string,"toCode":string,"toAirport":string,"depTimeLocal":"HH:MM 24h","arrTimeLocal":"HH:MM 24h","arrDateOffsetDays":number,"depTz":"IANA timezone","arrTz":"IANA timezone","depTerminal":string|null,"arrTerminal":string|null}. Times local to each airport. If the exact date is unknown use the regular schedule for that route.`,{google_search:{}})
+        .then(fJ=>{ collectItemForm();
+          if(!draft.title||/^flight\b/i.test(draft.title)) draft.title=`Flight ${fn} · ${fJ.fromCode||"?"} → ${fJ.toCode||"?"}`;
+          if(fJ.depTimeLocal) draft.time=fJ.depTimeLocal.slice(0,5);
+          if(fJ.arrTimeLocal){ draft.time2=fJ.arrTimeLocal.slice(0,5); const off=+fJ.arrDateOffsetDays||0; const x=new Date(dd+"T00:00:00Z"); x.setUTCDate(x.getUTCDate()+off); draft.date2=x.toISOString().slice(0,10); }
+          if(fJ.depTz) draft.tz=fJ.depTz; if(fJ.arrTz) draft.tz2=(fJ.arrTz===fJ.depTz?"":fJ.arrTz);
+          const terms=[fJ.depTerminal?("Dep "+fJ.depTerminal):null, fJ.arrTerminal?("Arr "+fJ.arrTerminal):null].filter(Boolean).join(" · ");
+          if(terms&&!(draft.notes||"").includes(terms)) draft.notes=((draft.notes||"")+"\n"+terms).trim();
+          if(fJ.fromCode||fJ.toCode) draft._airports={from:fJ.fromCode||null,to:fJ.toCode||null};
+          if(fJ.fromAirport&&!(draft.fromLoc&&draft.fromLoc.lat!=null)) draft.fromLoc={name:fJ.fromAirport};
+          if(fJ.toAirport&&!(draft.toLoc&&draft.toLoc.lat!=null)) draft.toLoc={name:fJ.toAirport};
+          itemModal(draft); toast("✈️ "+(fJ.airline||fn)+" filled — check & save",true); })
+        .catch(e=>{ const h=$("#flHint"); if(h) h.textContent=importErrMsg(e); });
+      break; }
     case "impBackToItem": itemModal(draft); break;
     case "impUse": { const pp=importCtx.proposals[+a.dataset.i]; if(!pp||!draft) break;
       if(pp.type&&TYPES[pp.type]){ draft.type=pp.type; draft._typeTouched=true; }
