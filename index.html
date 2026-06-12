@@ -657,7 +657,7 @@
 /* ============ INDO 2026 — single-file trip planner ============ */
 
 const STORE_KEY = "indoTrip.v1";
-const APP_BUILD = "12 Jun 2026 · r60";
+const APP_BUILD = "12 Jun 2026 · r61";
 // Built-in Google Maps key — restricted to henri-cmd.github.io + localhost, so safe in public source.
 // A user-entered key in Settings overrides it.
 const DEFAULT_MAPS_KEY = "AIzaSyA7dXO2NLOGXAdRzTvcyy8upVIKu4RHNk8";
@@ -891,11 +891,11 @@ function focusItem(id){
   const it = state.items.find(x=>x.id===id) || (state.hotspots||[]).find(x=>x.id===id);
   if(isMobile() && ui.view!=="today"){ setView("today"); }
   if(!it) return;
-  if(isMobile() && sheetViews() && sheet.state==="full") setSheet("half",true); // bring the map into view
   const run=()=>{
     if(!map) return;
     const pts=locsOf(it); if(!pts.length) return;
     const navLoc=startLoc(it)||endLoc(it); showFromMe(navLoc,(navLoc&&navLoc.name)||it.title);
+    if(isMobile() && sheetViews() && sheet.state==="full") return; // map hidden — don't move it, and never yank the sheet (Henri)
     // No auto-popup on item tap — the expanded card below shows everything; popups open only when a pin itself is tapped
     const far = pts.length>1 && pts[0].distanceTo(pts[pts.length-1])>400000; // >400km = a flight: don't zoom out to the world
     if(pts.length>1 && !far){
@@ -1123,6 +1123,10 @@ function tripDays(){
   // days that only RECEIVE an arrival/check-out still exist (continuation rows render there)
   items.forEach(it=>{ const ei=endInstant(it); if(!ei) return; const ek=dayKey(ei,endTz(it));
     if(ek!==itemDayKey(it) && !m.has(ek)) m.set(ek,{key:ek,instant:ei,tz:endTz(it),items:[]}); });
+  // fill the calendar gaps so EVERY day of the trip exists as a (free) day page (Henri)
+  if(m.size>1){ const keys=[...m.keys()].sort(); let cur=keys[0]; const last=keys[keys.length-1]; const tzD=state.meta.destTz; let guard=0;
+    while(cur<last && ++guard<120){ const x=new Date(cur+"T00:00:00Z"); x.setUTCDate(x.getUTCDate()+1); cur=x.toISOString().slice(0,10);
+      if(!m.has(cur)) m.set(cur,{key:cur,instant:wallToInstant(cur,"12:00",tzD),tz:tzD,items:[]}); } }
   return [...m.values()].sort((a,b)=>a.key<b.key?-1:1);
 }
 function currentDayIndex(days){
@@ -1267,7 +1271,8 @@ function tlRow(it,isLast){
   const linkedH = it.hotspotId ? (state.hotspots||[]).find(h=>h.id===it.hotspotId) : null;
   const metaBadges=[];
   if(it.type==="travel"){ if(it.flightNo) metaBadges.push("✈ "+esc(it.flightNo)); if(si&&ei&&ei>si&&isLeg) metaBadges.push(durShort(ei-si)); }
-  else if(it.type==="stay"){ if(it.date&&it.date2&&it.date2>it.date){ const nN=Math.max(1,Math.round((new Date(it.date2)-new Date(it.date))/86400000)); metaBadges.push("🛏 "+nN+" night"+(nN===1?"":"s")); } }
+  else if(it.type==="stay"){ if(it.date&&it.date2&&it.date2>it.date){ const nN=Math.max(1,Math.round((new Date(it.date2)-new Date(it.date))/86400000)); metaBadges.push("🛏 "+nN+" night"+(nN===1?"":"s")+" → "+fmtDateShort(endInstant(it),endTz(it))); } }
+  if(it.type!=="stay"&&!isLeg&&it.date&&it.date2&&it.date2>it.date) metaBadges.push("→ "+fmtDateShort(endInstant(it),endTz(it)));
   else if(si&&ei&&it.time&&it.time2&&ei>si) metaBadges.push("⏱ "+durShort(ei-si));
   if(linkedH&&linkedH.rating) metaBadges.push("★ "+linkedH.rating);
   const thumb = (linkedH&&linkedH.photos&&linkedH.photos[0]) ? `<span class="card-thumb" style="background-image:url('${esc(linkedH.photos[0])}')"></span>` : "";
@@ -1839,14 +1844,18 @@ function quickAddSubmit(dateKey, raw){
   renderMain(); refreshMap();
   if(pq.locQuery) quickAddEnrich(it.id, pq.locQuery);
 }
-async function quickAddEnrich(id, q){
+async function quickAddEnrich(id, q, attempt=0){
+  const it0=state.items.find(x=>x.id===id); if(!it0) return;
   const apply=loc=>{ const it=state.items.find(x=>x.id===id); if(!it||!loc||loc.lat==null) return; it.location=loc; save(); syncSet("items/"+id,it); refreshMap(); if(ui.view==="today") renderMain(); };
   try{
     if(googleReady && placesSvc()){
-      const opts={query:q}; try{ if(map){ opts.location=map.getCenter(); opts.radius=60000; } }catch(e){}
-      placesSvc().textSearch(opts,(arr,st)=>{ if(st===google.maps.places.PlacesServiceStatus.OK&&arr&&arr[0]){ const r=arr[0]; const g=r.geometry&&r.geometry.location; apply({name:r.name, address:r.formatted_address||"", lat:g?g.lat():null, lng:g?g.lng():null}); } });
+      const tryQ=(qq,fallback)=>{ const opts={query:qq}; try{ if(map){ opts.location=map.getCenter(); opts.radius=60000; } }catch(e){}
+        placesSvc().textSearch(opts,(arr,st)=>{ if(st===google.maps.places.PlacesServiceStatus.OK&&arr&&arr[0]){ const r=arr[0]; const g=r.geometry&&r.geometry.location; apply({name:r.name, address:r.formatted_address||"", lat:g?g.lat():null, lng:g?g.lng():null}); }
+          else if(fallback) tryQ(fallback,null); }); };
+      tryQ(q, (it0.title&&it0.title.toLowerCase()!==q.toLowerCase())?it0.title:null);
       return;
     }
+    if(attempt<20){ setTimeout(()=>quickAddEnrich(id,q,attempt+1),700); return; }
     const resp=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(q)}`,{headers:{Accept:"application/json"}});
     const arr=await resp.json();
     if(arr&&arr[0]) apply({name:(arr[0].display_name||q).split(",")[0], address:arr[0].display_name||"", lat:+arr[0].lat, lng:+arr[0].lon});
@@ -1987,7 +1996,7 @@ function itemModal(item){
   draft=item?JSON.parse(JSON.stringify(item)):{id:uid(),type:"activity",title:"",date:"",time:"",tz:state.meta.destTz,location:{},docIds:[],files:[]};
   const isEdit = !!(item && state.items.some(x=>x.id===item.id));
   const isLeg=TYPES[draft.type]?.legtoo;
-  const moreOpen=!!(draft.tz2||draft.conf||draft.notes||(draft.files||[]).length||draft.flightNo||(!isLeg&&draft.date2&&draft.date2!==draft.date));
+  const moreOpen=!!(draft.tz2||draft.conf||draft.notes||(draft.files||[]).length);
   let durSel=""; if(!isLeg&&draft.time&&draft.time2){ const [h1,m1]=draft.time.split(":").map(Number), [h2,m2]=draft.time2.split(":").map(Number);
     let mins=(h2*60+m2)-(h1*60+m1); if(draft.date2&&draft.date2!==draft.date) mins+=1440; if([30,60,90,120,180].includes(mins)) durSel=String(mins); else durSel="x"; }
   const typeBtns=Object.entries(TYPES).map(([k,t])=>`<button type="button" class="typebtn${draft.type===k?" on":""}" data-type="${k}"><span class="e">${t.emoji}</span>${t.label}</button>`).join("");
@@ -2001,15 +2010,15 @@ function itemModal(item){
         <div class="field"><label>${isLeg?"Departure time":"Time"}</label><input class="inp" type="time" id="f-time" value="${esc(draft.time||"")}"></div></div>
       ${isLeg?`<div class="row2"><div class="field"><label>Arrival date</label><input class="inp" type="date" id="f-date2" value="${esc(draft.date2||"")}"></div>
         <div class="field"><label>Arrival time</label><input class="inp" type="time" id="f-time2" value="${esc(draft.time2||"")}"></div></div>`
-      :`<div class="field"><label>Duration (optional)</label><div class="durrow" id="durRow">${[["","—"],["30","30m"],["60","1h"],["90","1½h"],["120","2h"],["180","3h"]].map(d=>`<button type="button" class="durchip${durSel===d[0]?" on":""}" data-act="durChip" data-min="${d[0]}">${d[1]}</button>`).join("")}</div></div>`}
+      :`<div class="field"><label>Duration (optional)</label><div class="durrow" id="durRow">${[["","—"],["30","30m"],["60","1h"],["90","1½h"],["120","2h"],["180","3h"]].map(d=>`<button type="button" class="durchip${durSel===d[0]?" on":""}" data-act="durChip" data-min="${d[0]}">${d[1]}</button>`).join("")}</div></div>
+      <div class="row2"><div class="field"><label>End date (optional)</label><input class="inp" type="date" id="f-date2" value="${esc(draft.date2||"")}"></div>
+        <div class="field"><label>End time (optional)</label><input class="inp" type="time" id="f-time2" value="${esc(draft.time2||"")}"></div></div>`}
+      ${draft.type==="travel"?`<div class="field"><label>Flight number (optional — flights only, enables live status)</label><input class="inp mono" id="f-flightno" value="${esc(draft.flightNo||"")}" placeholder="e.g. QR35"></div>`:""}
       <div id="locBlock"></div>
       <button type="button" class="more-toggle" data-act="toggleMore">⚙︎ More options <span class="mchev">▾</span></button>
       <div id="moreFold" style="display:${moreOpen?"block":"none"}">
         <div class="row2"><div class="field"><label>${isLeg?"Departure zone":"Time zone"}</label><select class="inp" id="f-tz">${zoneOptions(draft.tz||state.meta.destTz)}</select></div>
           <div class="field"><label>${isLeg?"Arrival zone":"End zone (optional)"}</label><select class="inp" id="f-tz2"><option value="">— same —</option>${COMMON_ZONES.map(z=>`<option value="${z.tz}"${draft.tz2===z.tz?" selected":""}>${esc(z.label)}</option>`).join("")}</select></div></div>
-        ${!isLeg?`<div class="row2"><div class="field"><label>End date (optional)</label><input class="inp" type="date" id="f-date2" value="${esc(draft.date2||"")}"></div>
-          <div class="field"><label>End time (optional)</label><input class="inp" type="time" id="f-time2" value="${esc(draft.time2||"")}"></div></div>`:""}
-        ${draft.type==="travel"?`<div class="field"><label>Flight number (optional — flights only, enables live status)</label><input class="inp mono" id="f-flightno" value="${esc(draft.flightNo||"")}" placeholder="e.g. QR35"></div>`:""}
         <div class="field"><label>Booking / confirmation ref (optional)</label><input class="inp mono" id="f-conf" value="${esc(draft.conf||"")}" placeholder="e.g. ABC123"></div>
         <div class="field"><label>Notes (optional)</label><textarea class="inp" id="f-notes" placeholder="Anything useful — terminal, room type, what to bring…">${esc(draft.notes||"")}</textarea></div>
         <div class="field"><label>Upload files (tickets, confirmations, PDFs…)</label>
